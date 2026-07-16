@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TypeID</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="card">
+  <div class="eyebrow">Typing sample</div>
+
+  <div class="prompt-row">
+    <p id="prompt" class="prompt"></p>
+    <button id="shuffle" class="icon-btn" title="New sentence" aria-label="New sentence">&#8635;</button>
+  </div>
+
+  <textarea
+    id="input"
+    class="input"
+    rows="3"
+    placeholder="Start typing…"
+    autocomplete="off"
+    autocorrect="off"
+    autocapitalize="off"
+    spellcheck="false"
+  ></textarea>
+
+  <div class="meta">
+    <span id="progress">0 keystrokes</span>
+  </div>
+
+  <button id="record" class="primary-btn" disabled>Record Typing ID</button>
+
+  <section id="results" class="results hidden">
+    <h2>Typing ID recorded</h2>
+
+    <div class="stats">
+      <div class="stat"><span class="stat-value" id="stat-count">0</span><span class="stat-label">keystrokes</span></div>
+      <div class="stat"><span class="stat-value" id="stat-duration">0.0s</span><span class="stat-label">duration</span></div>
+      <div class="stat"><span class="stat-value" id="stat-wpm">0</span><span class="stat-label">wpm</span></div>
+      <div class="stat"><span class="stat-value" id="stat-dwell">0ms</span><span class="stat-label">avg dwell</span></div>
+      <div class="stat"><span class="stat-value" id="stat-flight">0ms</span><span class="stat-label">avg flight</span></div>
+    </div>
+
+    <div class="rhythm" id="rhythm" aria-label="Dwell time per keystroke"></div>
+
+    <div class="raw-toggle">
+      <button id="toggle-raw" class="link-btn">Show raw event log</button>
+      <button id="copy-raw" class="link-btn hidden">Copy JSON</button>
+    </div>
+    <pre id="raw-log" class="raw-log hidden"></pre>
+
+    <button id="reset" class="secondary-btn">Try another sentence</button>
+  </section>
+</main>
+
+<script src="sentences.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
