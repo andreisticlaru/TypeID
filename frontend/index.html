@@ -4,20 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TypeID</title>
-<link rel="stylesheet" href="style.css">
 </head>
-<body>
-<main class="card">
-  <div class="eyebrow">Typing sample</div>
+<body class="m-0 min-h-screen flex items-center justify-center p-8 bg-[var(--color-bg)] text-[var(--color-text)] font-sans">
+<main class="w-full max-w-[560px] bg-[var(--color-card)] rounded-3xl shadow-[var(--shadow-card)] p-12">
+  <div class="text-xs font-semibold tracking-widest uppercase text-[var(--color-text-secondary)] mb-4">Typing sample</div>
 
-  <div class="prompt-row">
-    <p id="prompt" class="prompt"></p>
-    <button id="shuffle" class="icon-btn" title="New sentence" aria-label="New sentence">&#8635;</button>
+  <div class="flex items-start gap-3 mb-7">
+    <p id="prompt" class="flex-1 m-0 text-2xl leading-snug font-medium tracking-tight"></p>
+    <button id="shuffle" class="shrink-0 w-9 h-9 rounded-full border-0 bg-[var(--color-bg)] text-[var(--color-text-secondary)] text-base cursor-pointer transition duration-150 hover:bg-[var(--color-border)] hover:rotate-45" title="New sentence" aria-label="New sentence">&#8635;</button>
   </div>
 
   <textarea
     id="input"
-    class="input"
+    class="w-full resize-none border-0 border-b border-[var(--color-border)] bg-transparent text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] font-sans text-[17px] leading-relaxed py-2 outline-none transition-colors duration-150 focus:border-b-[var(--color-accent)]"
     rows="3"
     placeholder="Start typing…"
     autocomplete="off"
@@ -26,36 +25,35 @@
     spellcheck="false"
   ></textarea>
 
-  <div class="meta">
+  <div class="mt-2.5 text-[13px] text-[var(--color-text-secondary)]">
     <span id="progress">0 keystrokes</span>
   </div>
 
-  <button id="record" class="primary-btn" disabled>Record Typing ID</button>
+  <button id="record" class="mt-7 w-full py-3.5 px-7 border-0 rounded-full bg-[var(--color-text)] text-[var(--color-card)] font-sans text-base font-semibold cursor-pointer transition disabled:opacity-35 disabled:cursor-not-allowed enabled:hover:opacity-85 enabled:active:scale-[0.98]" disabled>Record Typing ID</button>
 
-  <section id="results" class="results hidden">
-    <h2>Typing ID recorded</h2>
+  <section id="results" class="hidden mt-9 pt-8 border-t border-[var(--color-border)]">
+    <h2 class="m-0 mb-5 text-lg font-semibold">Typing ID recorded</h2>
 
-    <div class="stats">
-      <div class="stat"><span class="stat-value" id="stat-count">0</span><span class="stat-label">keystrokes</span></div>
-      <div class="stat"><span class="stat-value" id="stat-duration">0.0s</span><span class="stat-label">duration</span></div>
-      <div class="stat"><span class="stat-value" id="stat-wpm">0</span><span class="stat-label">wpm</span></div>
-      <div class="stat"><span class="stat-value" id="stat-dwell">0ms</span><span class="stat-label">avg dwell</span></div>
-      <div class="stat"><span class="stat-value" id="stat-flight">0ms</span><span class="stat-label">avg flight</span></div>
+    <div class="grid grid-cols-3 gap-x-3 gap-y-5">
+      <div class="flex flex-col"><span class="text-[22px] font-semibold tracking-tight" id="stat-count">0</span><span class="mt-0.5 text-xs text-[var(--color-text-secondary)]">keystrokes</span></div>
+      <div class="flex flex-col"><span class="text-[22px] font-semibold tracking-tight" id="stat-duration">0.0s</span><span class="mt-0.5 text-xs text-[var(--color-text-secondary)]">duration</span></div>
+      <div class="flex flex-col"><span class="text-[22px] font-semibold tracking-tight" id="stat-wpm">0</span><span class="mt-0.5 text-xs text-[var(--color-text-secondary)]">wpm</span></div>
+      <div class="flex flex-col"><span class="text-[22px] font-semibold tracking-tight" id="stat-dwell">0ms</span><span class="mt-0.5 text-xs text-[var(--color-text-secondary)]">avg dwell</span></div>
+      <div class="flex flex-col"><span class="text-[22px] font-semibold tracking-tight" id="stat-flight">0ms</span><span class="mt-0.5 text-xs text-[var(--color-text-secondary)]">avg flight</span></div>
     </div>
 
-    <div class="rhythm" id="rhythm" aria-label="Dwell time per keystroke"></div>
+    <div class="mt-7 h-14 flex items-end gap-0.5" id="rhythm" aria-label="Dwell time per keystroke"></div>
 
-    <div class="raw-toggle">
-      <button id="toggle-raw" class="link-btn">Show raw event log</button>
-      <button id="copy-raw" class="link-btn hidden">Copy JSON</button>
+    <div class="mt-5 flex gap-4">
+      <button id="toggle-raw" class="border-0 bg-transparent text-[var(--color-accent)] font-sans text-[13px] font-medium cursor-pointer p-0">Show raw event log</button>
+      <button id="copy-raw" class="hidden border-0 bg-transparent text-[var(--color-accent)] font-sans text-[13px] font-medium cursor-pointer p-0">Copy JSON</button>
     </div>
-    <pre id="raw-log" class="raw-log hidden"></pre>
+    <pre id="raw-log" class="hidden mt-3 max-h-[220px] overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words bg-[var(--color-bg)] rounded-xl p-4 font-mono text-xs leading-relaxed text-[var(--color-text)]"></pre>
 
-    <button id="reset" class="secondary-btn">Try another sentence</button>
+    <button id="reset" class="mt-6 w-full py-3 px-7 border border-[var(--color-border)] rounded-full bg-transparent text-[var(--color-text)] font-sans text-[15px] font-medium cursor-pointer transition-colors duration-150 hover:bg-[var(--color-bg)]">Try another sentence</button>
   </section>
 </main>
 
-<script src="sentences.js"></script>
-<script src="app.js"></script>
+<script type="module" src="/src/main.js"></script>
 </body>
 </html>

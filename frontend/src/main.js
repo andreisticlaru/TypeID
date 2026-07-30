@@ -1,3 +1,8 @@
+import { pickSentence } from './sentences.js';
+import './style.css';
+
+// TODO: wire to backend /enroll and /identify endpoints
+
 (function () {
   const promptEl = document.getElementById("prompt");
   const inputEl = document.getElementById("input");
@@ -119,7 +124,7 @@
     const maxDwell = Math.max(...dwellValues, 1);
     for (const d of dwellValues) {
       const bar = document.createElement("div");
-      bar.className = "rhythm-bar";
+      bar.className = "flex-1 min-w-[2px] bg-[var(--color-accent)] rounded-t-sm opacity-85";
       bar.style.height = `${Math.max((d / maxDwell) * 100, 6)}%`;
       rhythmEl.appendChild(bar);
     }

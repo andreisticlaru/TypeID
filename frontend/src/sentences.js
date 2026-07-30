@@ -33,7 +33,7 @@ const SENTENCES = [
   "give me two minutes, im just finishing something up",
 ];
 
-function pickSentence(exclude) {
+export function pickSentence(exclude) {
   const pool = exclude
     ? SENTENCES.filter((s) => s !== exclude)
     : SENTENCES;
