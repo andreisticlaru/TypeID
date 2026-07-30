@@ -1,0 +1,4 @@
+backend/.venv/
+backend/gallery.db
+__pycache__/
+*.pyc
