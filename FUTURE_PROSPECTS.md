@@ -150,6 +150,58 @@ data*, not a standalone surveillance tool. This is both the better ML
 design (forces rhythm-learning over content-memorization) and the more
 honest forensic scope.
 
+## 7. Data protection: is typing-rhythm data personal data, and could client-side processing avoid sending it off-device?
+
+**Yes to both questions — worth stating precisely, since overclaiming here
+would be inaccurate.**
+
+- GDPR's personal-data definition (Art. 4(1)) is broad: anything relating
+  to an identifiable person. Timing data clears that bar trivially, since
+  discriminating identity is the whole point of the system.
+- It likely goes further, into **special-category biometric data** (Art. 9):
+  Art. 4(14) defines biometric data as data resulting from technical
+  processing of physical, physiological, **or behavioural** characteristics
+  used for unique identification. Typing rhythm is explicitly behavioural,
+  and unique identification is this system's explicit purpose. Special-category
+  data needs explicit consent (or another Art. 9 exemption) and typically a
+  DPIA before real deployment.
+- Asymmetry worth noting against section 6 above: content capture
+  (keylogging) is regulated as communications interception (wiretap law);
+  timing-only capture is regulated as biometric data. Different legal
+  regime, not a lighter one — dropping key identity doesn't dodge privacy
+  law, it just changes which law applies.
+
+**Could running feature extraction and embedding entirely client-side avoid
+sending biometric data off-device?**
+
+Partially, not fully:
+
+- Feature extraction and the frozen embedding model could both run in the
+  browser — Pyodide (real CPython in WASM) to reuse the *exact* Python
+  extraction code without a JS reimplementation, and ONNX/TF.js for the
+  frozen LSTM — so raw keydown/keyup timestamps would never leave the
+  device, only the resulting 128-dim embedding would be sent to the
+  backend for gallery storage/comparison.
+- This meaningfully shrinks exposure: raw timing is a richer,
+  more-reconstructable signal than a compressed embedding.
+- It does not exit the regulatory category, though. The embedding is still
+  "data resulting from specific technical processing" of a behavioural
+  characteristic — the same reasoning that makes a face-recognition
+  embedding or fingerprint minutiae template count as biometric data, not
+  just the raw scan. Consent, HTTPS in transit, and a deletion policy would
+  still be needed for the embedding.
+- A fully "nothing biometric ever leaves the client" version would require
+  local-only enrollment/identification against a gallery stored in the
+  browser — workable only for a single shared device, and it abandons the
+  growing multi-person gallery premise the project is built around.
+
+**Decision for now:** keep the current architecture (raw events -> backend
+-> canonical Python extractor, per CLAUDE.md's single-source-of-truth
+principle). Client-side extraction/embedding via Pyodide/ONNX is a valid
+future direction if the project needs a stronger privacy story, but isn't
+required at portfolio-demo scope, which isn't processing real users' data
+under a live consent regime.
+
 ## Sources
 
 - [Free vs. transcribed text for keystroke-dynamics evaluations (LASER 2012)](https://dl.acm.org/doi/10.1145/2379616.2379617)
@@ -172,3 +224,7 @@ honest forensic scope.
 - [DOJ Electronic Surveillance Manual (justice.gov, PDF)](https://www.justice.gov/sites/default/files/criminal/legacy/2014/10/29/elec-sur-manual.pdf)
 - [Daubert Standard (Wikipedia)](https://en.wikipedia.org/wiki/Daubert_standard)
 - [Forensic Evidence Admissibility & Expert Witnesses: Daubert Standard (Forensic Science Simplified)](https://www.forensicsciencesimplified.org/legal/daubert.html)
+
+**Data protection:**
+- [GDPR Article 4 — Definitions, incl. "personal data" and "biometric data" (gdpr-info.eu)](https://gdpr-info.eu/art-4-gdpr/)
+- [GDPR Article 9 — Processing of special categories of personal data (gdpr-info.eu)](https://gdpr-info.eu/art-9-gdpr/)
