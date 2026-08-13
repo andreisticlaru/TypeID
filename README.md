@@ -1,21 +1,14 @@
 # TypeID — Keystroke Biometrics Identification
 
-A portfolio project exploring **open-set biometric identification from free-text keystroke
-dynamics** — the typing-rhythm equivalent of a fingerprint or face-recognition search system.
-Given an unknown typing sample, the goal is to return the top-K most likely matches from a
-gallery of enrolled identities.
+A portfolio project exploring **open-set biometric identification from free-text keystroke dynamics** — the typing-rhythm equivalent of a fingerprint or face-recognition search system. Given an unknown typing sample, identify the top-K most likely matches from a gallery of enrolled identities.
 
-This is **not a classifier**. It's a 1:N gallery search built on a learned embedding space: a
-network is trained once, offline, to map a keystroke sequence to a vector such that the same
-person's typing lands close together and different people's typing lands far apart. New people
-can be enrolled later without retraining anything — enrollment/query are just a forward pass
-plus nearest-neighbor search.
+This is **not a classifier**. It's a 1:N gallery search built on a learned embedding space. A network is trained once, offline, on a public dataset to map keystroke sequences to vectors such that the same person's typing clusters together and different people's typing spreads apart. New people enroll later without retraining—enrollment and query are just a forward pass plus nearest-neighbor search.
 
-Subjects prove identity by **transcribing a random on-screen sentence** they've never seen
-before (not free composition, not a fixed repeated password). See [CLAUDE.md](CLAUDE.md) for
-the full design rationale, including why this is a proxy task rather than a forensically
-validated system, and [FUTURE_PROSPECTS.md](FUTURE_PROSPECTS.md) for open research questions
-(free-composition mode, cross-device generalization, legal framing).
+Subjects prove identity by **transcribing a random on-screen sentence** they've never seen before (not free composition, not a fixed password). The sentence varies every session, which rules out fixed-position features but forces the model to learn subject-specific rhythm rather than content-specific timing.
+
+## Why This Framing Matters
+
+Keystroke biometrics is not a solved problem—particularly the generalization gap between transcription (controlled, read-then-copy) and free composition (spontaneous, think-then-type). This project validates the **embedding + ranking architecture** on a transcription proxy task. It's a real improvement over fixed-password datasets (forces generalization to unseen text, avoids memorizing one password's motor pattern) but carries a known domain gap against composed text. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full technical design, [FUTURE_PROSPECTS.md](FUTURE_PROSPECTS.md) for next steps (composition capture, cross-device evaluation), and [CLAUDE.md](CLAUDE.md) for how to contribute.
 
 ## Try it out
 
@@ -41,7 +34,7 @@ Serves on `http://localhost:5173`, CORS-allowed against the backend above.
 
 ## Current state vs. target
 
-| Piece | Target (per [CLAUDE.md](CLAUDE.md)) | Current state |
+| Piece | Target (per [ARCHITECTURE.md](ARCHITECTURE.md)) | Current state |
 |---|---|---|
 | Feature extraction (`features/extract.py`) | Canonical HL/IL/PL/RL timing-vector extractor, shared byte-for-byte by training and live capture | Stub — raises `NotImplementedError`; not yet built against real Aalto data |
 | Model (`/model`) | 2-layer LSTM triplet-loss embedding network, trained on Aalto | Doesn't exist yet — no directory, no training script, no weights |
@@ -57,19 +50,20 @@ ranking/thresholding logic, frontend capture), but the **ML core is not built** 
 extractor, no trained embedding model. That's the critical path; everything downstream of it is
 already waiting and wired up.
 
-## Architecture
+## How It Works
 
-```
-[Training — offline, once]        Aalto dataset -> triplet-loss LSTM -> frozen f()
-[Enrollment]                      2-3 transcribed prompts -> extract_features() -> f() -> stored embedding
-[Identification]                  1 transcribed prompt -> extract_features() -> f() -> cosine-rank gallery -> top-5
-```
+**Data:** Per-keystroke timing vectors (hold, inter-key, press, release latencies) extracted from keystroke events. Variable-length sequences, text-independent—the model learns typing rhythm, not what was typed.
 
-`features/extract.py` is the single canonical feature extractor — it must be used unchanged by
-both the offline training pipeline and the live `/enroll` and `/identify` endpoints. This is the
-most important invariant in the project; see CLAUDE.md's "Things to get right" section.
+**Model:** 2-layer LSTM encoder trained on triplet loss. Anchor and positive pairs are two different sessions from the same person (different transcribed text each time). Negatives are sessions from different people. The triplet loss pushes same-person embeddings close and different-people embeddings far.
 
-## Repo structure
+**Training → Enrollment → Identification:**
+1. Train the LSTM once on Aalto dataset (public, 136M keystrokes, thousands of subjects). Output: frozen embedding function `f()`.
+2. User enrolls: transcribes 2–3 random prompts. Backend extracts timing features, runs through `f()`, stores embedding + name in gallery.
+3. Unknown sample arrives. Extract timing, embed with `f()`, rank gallery by cosine similarity, return top-5 candidates.
+
+**Critical invariant:** `features/extract.py` is the single canonical feature extractor used by both training and live endpoints. Any divergence between training features and query features introduces silent bugs—a model trained on slightly-different features degrades without error. See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed feature and model specs.
+
+## Repo Structure
 
 ```
 /data/        Aalto dataset (raw + preprocessed) — not yet populated
@@ -78,7 +72,9 @@ most important invariant in the project; see CLAUDE.md's "Things to get right" s
 /eval/        CMC curve, Rank-N accuracy scripts — not yet created
 /backend/     FastAPI app: gallery store (done), /enroll + /identify (wired, blocked on model)
 /frontend/    Vite + Tailwind capture UI (working, not yet wired to backend)
+
+ARCHITECTURE.md  Full technical design: data specs, model, evaluation metrics
+CLAUDE.md        Contribution guidelines and working conventions
 ```
 
-For the full architecture, feature spec, model/loss details, and evaluation methodology, see
-[CLAUDE.md](CLAUDE.md).
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed feature extraction, model architecture, and evaluation methodology.
