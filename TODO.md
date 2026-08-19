@@ -22,7 +22,7 @@ Essential foundation—everything downstream depends on this.
   - ✅ Backspace kept as a real keystroke (no special-casing needed—dataset already logs it as `BKSP`)
   - ✅ `MIN_KEYSTROKES = 25` floor enforced, raises `ValueError` below it
   - ✅ Verified end-to-end on real Aalto files, including a CSV-quoting bug fix (`csv.QUOTE_NONE`—Aalto sentences contain literal `"` chars that broke default quoting and silently merged rows)
-  - Still open: unit tests (`test_extract.py`) covering edge cases formally, rather than the one-off verification script used so far
+  - ✅ `features/test_extract.py`: 11 unit tests covering windowing/masking/padding boundaries, the min-length guard, event pairing (sequential, overlapping, orphaned keyup), and negative-IL preservation. All passing.
 
 - [ ] **Cache preprocessed Aalto sequences**
   - Apply `features/extract.py` to all Aalto sessions
