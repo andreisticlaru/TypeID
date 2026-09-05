@@ -204,6 +204,7 @@ under a live consent regime.
 
 ## Sources
 
+- [Observations on Typing from 136 Million Keystrokes (Dhakal et al., CHI 2018)](https://dl.acm.org/doi/10.1145/3173574.3174220) — the Aalto dataset this project trains on. [Free PDF](https://acris.aalto.fi/ws/portalfiles/portal/21495207/ELEC_Dhakal_et_al_Observations_CHI2018.pdf), [dataset download](https://userinterfaces.aalto.fi/136Mkeystrokes/).
 - [Free vs. transcribed text for keystroke-dynamics evaluations (LASER 2012)](https://dl.acm.org/doi/10.1145/2379616.2379617)
 - [TypeNet: Deep Learning Keystroke Biometrics (arXiv)](https://arxiv.org/pdf/2101.05570)
 - [LLM-Assisted Cheating Detection in Korean Language via Keystrokes (arXiv)](https://arxiv.org/html/2507.22956v1)

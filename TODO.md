@@ -24,11 +24,25 @@ Essential foundation—everything downstream depends on this.
   - ✅ Verified end-to-end on real Aalto files, including a CSV-quoting bug fix (`csv.QUOTE_NONE`—Aalto sentences contain literal `"` chars that broke default quoting and silently merged rows)
   - ✅ `features/test_extract.py`: 11 unit tests covering windowing/masking/padding boundaries, the min-length guard, event pairing (sequential, overlapping, orphaned keyup), and negative-IL preservation. All passing.
 
-- [ ] **Cache preprocessed Aalto sequences**
-  - Apply `features/extract.py` to all Aalto sessions
-  - Store as `.npy` or parquet in `/data/preprocessed/`
-  - Index by subject_id + session_id for training triplet construction
-  - Goal: Fast data loading during model training (avoid recomputing on every epoch)
+- [x] **Cache preprocessed Aalto sequences**
+  - ✅ `data/build_cache.py` runs `windows_from_keystrokes()` over all Aalto sessions, saves to `/data/preprocessed/` as four flat `.npy` arrays (no per-subject files — grouping by subject happens later via an in-memory index over `subject_ids.npy`)
+  - ✅ Full run (168,593 participants): `sessions_ok=2,280,166`, `sessions_skipped=248,729` (below `MIN_KEYSTROKES` floor), elapsed=2161s (~36 min)
+  - ✅ Verified saved arrays:
+    ```
+    windows.npy      (3343148, 50, 4) float32
+    mask.npy         (3343148, 50) bool
+    subject_ids.npy  (3343148,) <U6
+    session_ids.npy  (3343148,) <U7
+
+    unique subjects: 168593 (matches participants_processed)
+    any NaN in windows: False
+    mask true-count per row: min=1, max=50 (never 0, never >50)
+    padded region is all-zero: confirmed on sample rows
+    first row: subject=100001, session=1090979 (1 window for this subject/session)
+    ```
+  - ✅ Example row at the minimum-length floor — row 61 (subject=100008, session=1091062, real length=25): `mask[61]` is `True` for indices 0-24, `False` for 25-49; `windows[61][20:29]` shows real HL/IL/PL/RL values through index 24, then exact `(0,0,0,0)` padding onward — confirms padding/masking works correctly at the boundary
+  - Note: `sessions_ok` (2.28M) < total windows (3.34M) because sessions longer than M=50 split into multiple windows — expected, not a bug
+  - Goal: Fast data loading during model training (avoid recomputing on every epoch) ✓
 
 ## Phase 2: Model Training
 

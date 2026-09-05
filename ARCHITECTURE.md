@@ -1,5 +1,20 @@
 # Architecture — TypeID Keystroke Biometrics
 
+## TL;DR — What Are We Actually Training?
+
+We're training an **embedding function**, not a classifier: `f(sequence of keystroke timing vectors) -> 128-dim vector`. It has no notion of identity—it never outputs "this is Andrei." It only places a typing sample at a point in 128-dimensional space.
+
+**Training** happens once, offline, on the public Aalto "136M Keystrokes" dataset—subjects transcribing random on-screen English sentences, the same capture protocol this project's own enrollment/identification uses. Each training step shows the network a triplet: an **anchor** sample from person A, a **positive** sample (a different session, same person A, different sentence), and a **negative** sample from person B. All three pass through the *same* encoder weights. The loss pulls anchor and positive closer together and pushes anchor and negative apart. Across thousands of Aalto subjects, the network can't cheat by memorizing individuals—the only strategy that generalizes is learning the general shape of "same-rhythm vs. different-rhythm," i.e. typing cadence itself, not who's doing the typing or what sentence they typed.
+
+Once trained, the encoder is **frozen**—no further learning happens at enrollment or query time:
+
+- **Enrollment:** a new person (never seen in training) transcribes a prompt. Their keystrokes go through `feature extraction -> f() -> embedding`, and that embedding is stored alongside their name/ID in the gallery. No retraining.
+- **Identification:** someone transcribes a prompt. Their keystrokes go through the same `feature extraction -> f()`, and the resulting embedding is compared (cosine similarity) against every stored embedding in the gallery. The closest match (above a threshold) is the answer; below threshold means "no match."
+
+This is what makes it open-set: adding a new enrolled person is just one forward pass, never a retrain.
+
+**Caveat worth remembering:** transcription is itself a proxy for real forensic use, where the text of interest is usually freely composed, not copied from a prompt. Training and this project's own capture protocol match each other (both transcription)—the open domain-gap question is whether a model trained this way generalizes to free composition. See [FUTURE_PROSPECTS.md](FUTURE_PROSPECTS.md) for that discussion.
+
 ## 1:N Gallery Search, Not Classification
 
 This project is fundamentally a **gallery search system** built on learned embeddings, not a multiclass classifier. That distinction drives every architectural choice.
