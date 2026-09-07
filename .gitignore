@@ -3,3 +3,4 @@ backend/gallery.db
 __pycache__/
 *.pyc
 data/preprocessed/
+.venv-model/
