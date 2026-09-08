@@ -32,7 +32,7 @@ def cosine_distance(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     a, b: (batch, embedding_dim), each row already unit-norm.
     Returns: (batch,) distance per pair.
     """
-    # TODO: cosine similarity between two unit vectors is just their dot
+    # cosine similarity between two unit vectors is just their dot
     # product -- elementwise multiply then sum over the embedding dim
     # (dim=1). Return 1 - that.
 
@@ -53,7 +53,7 @@ def triplet_loss(
     embeddings -- three separate forward passes of the same KeystrokeEncoder.
     Returns: scalar loss.
     """
-    # TODO:
+
     #   1. d_ap = cosine_distance(anchor, positive)
     #   2. d_an = cosine_distance(anchor, negative)
     #   3. per_example = max(0, d_ap - d_an + margin)  -- torch.clamp(..., min=0)
