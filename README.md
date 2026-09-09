@@ -1,4 +1,6 @@
-<img src="image.png" alt="TypeID" width="200" style="vertical-align: middle; margin-right: 10px;"> **TypeID: Keystroke Biometrics Identification**
+<img src="image.png" alt="TypeID" width="200" style="vertical-align: middle; horizontal-align: middle; margin-right: 10px;">
+
+# TypeID: Keystroke Biometrics Identification
 *Open-set 1:N gallery search on typing rhythm*
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://www.python.org/)
