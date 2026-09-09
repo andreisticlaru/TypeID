@@ -1,11 +1,10 @@
-![TypeID](image.png)
-
-# TypeID: Keystroke Biometrics Identification
+<img src="image.png" alt="TypeID" width="60" style="vertical-align: middle; margin-right: 10px;"> **TypeID: Keystroke Biometrics Identification**
 *Open-set 1:N gallery search on typing rhythm*
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.6-red)](https://pytorch.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.4-green)](https://developer.nvidia.com/cuda-toolkit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A portfolio project exploring **open-set biometric identification from keystroke dynamics** — the typing-rhythm equivalent of a fingerprint or face-recognition search system. Given an unknown typing sample, identify the top-K most likely matches from a gallery of enrolled identities.
 
