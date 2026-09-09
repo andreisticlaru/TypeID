@@ -1,7 +1,10 @@
-<img src="image.png" alt="TypeID" width="200" style="vertical-align: middle; horizontal-align: middle; margin-right: 10px;">
-
-# TypeID: Keystroke Biometrics Identification
-*Open-set 1:N gallery search on typing rhythm*
+<div align="center">
+  <img src="image.png" alt="TypeID" width="200">
+  
+  # TypeID: Keystroke Biometrics Identification
+  
+  *Open-set 1:N gallery search on typing rhythm*
+</div>
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.6-red)](https://pytorch.org/)
