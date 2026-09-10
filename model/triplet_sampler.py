@@ -2,7 +2,7 @@
 
 Triplet construction (per ARCHITECTURE.md):
 - Anchor (A): a random window from subject X
-- Positive (P): a different window from the SAME subject X, but different session_id
+- Positive (P): a different window from the SAME subject X, but different session_id -- same person writing a different sentence
   (forces learning of person-specific rhythm, not sentence-specific timing)
 - Negative (N): a window from a different subject Y (Y ≠ X)
 
@@ -30,19 +30,77 @@ class TripletSampler:
         # self.mask = ...
         # self.subject_ids = ...
         # self.session_ids = ...
-        raise NotImplementedError
+        
+
+        self.windows = np.load(windows_path)
+        self.mask = np.load(mask_path)
+        self.subject_ids = np.load(subject_ids_path)
+        self.session_ids = np.load(session_ids_path)
+
+        self.subject_to_rows, self.subject_session_to_rows = self._build_subject_index()
+
 
     def _build_subject_index(self):
-        """Build lookup: subject_id -> list of window row indices.
+        """Build lookup: subject_id -> list of window row indexes (indeces)
 
-        Also build: (subject_id, session_id) -> list of window row indices.
+        Also build: (subject_id, session_id) -> list of window row indexes (indeces)
         These enable fast triplet construction without scanning arrays repeatedly.
         """
+
+    #--------------------------------------------------------------------------------------------------------
+    #       index:       0          1          2          3          4          5          6      ...
+    #       subject_id:  100001     100001     100001     100001     100001     100001     100001  ...
+    #       session_id:  1090979    1091016    1091025    1091025    1091042    1091042    1091058 ...
+    #       window:      (50,4)#0   (50,4)#1   (50,4)#2   (50,4)#3   (50,4)#4   (50,4)#5   (50,4)#6 ...
+    #       mask (real): 48/50      32/50      50/50      9/50       50/50      3/50       50/50   ...
+    #--------------------------------------------------------------------------------------------------------
+    #
+    #
+    #   subject_to_rows["100001"] = [0, 1, 2, 3, 4, 5, 6, 7, ...]   # every row where subject_ids[i] == "100001"
+    #
+    #   subject_session_to_rows[("100001", "1091025")] = [2, 3]
+    #   subject_session_to_rows[("100001", "1091042")] = [4, 5]
+    #   subject_session_to_rows[("100001", "1091058")] = [6, 7]
+
         # TODO: Iterate over self.subject_ids and self.session_ids, building two dicts:
         #   subject_to_rows: {subject_id: [row0, row1, ...]}
         #   subject_session_to_rows: {(subject_id, session_id): [row0, row1, ...]}
         # This is a one-time overhead; called once in __init__.
-        raise NotImplementedError
+
+        subject_to_rows = {}
+        subject_session_to_rows = {}
+
+        # Iterate over all rows in the dataset to populate the dictionaries
+        for i in range(len(self.subject_ids)):
+
+            subject_id = self.subject_ids[i]
+            session_id = self.session_ids[i]
+
+            # Update subject_to_rows
+
+            if subject_id not in subject_to_rows:
+                subject_to_rows[subject_id] = [] # create new entry in dict with empty list
+
+            # else
+            subject_to_rows[subject_id].append(i) # append to the list of existing entry 
+
+
+
+            # Update subject_session_to_rows
+
+            key = (subject_id, session_id)
+
+            if key not in subject_session_to_rows:
+                subject_session_to_rows[key] = [] # create new entry in dict with empty list
+
+            # else
+            subject_session_to_rows[key].append(i) # append to the list of existing entry
+
+
+        return subject_to_rows, subject_session_to_rows
+
+
+        
 
     def sample_triplet(self):
         """Draw one triplet: (anchor_window, anchor_mask, positive_window, ..., negative_window, negative_mask).
