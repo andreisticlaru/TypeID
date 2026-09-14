@@ -73,15 +73,25 @@ class WindowsFromKeystrokesTests(unittest.TestCase):
         self.assertEqual(windows.shape, (1, M, 4))
         self.assertTrue(mask.all())
 
-    def test_splits_into_multiple_windows(self):
-        # N-1 == M + 1: second window holds exactly one real vector.
+    def test_short_trailing_window_is_dropped(self):
+        # N-1 == M + 1: second window would hold only one real vector,
+        # well under MIN_KEYSTROKES -- too thin to trust, so it's dropped
+        # rather than kept as a near-empty window.
         pairs = make_pairs(M + 2)
+        windows, mask = windows_from_keystrokes(pairs)
+        self.assertEqual(windows.shape, (1, M, 4))
+        self.assertTrue(mask.all())
+
+    def test_splits_into_multiple_windows(self):
+        # N-1 == M + MIN_KEYSTROKES: second window holds exactly
+        # MIN_KEYSTROKES real vectors, right at the floor, so it's kept.
+        pairs = make_pairs(M + MIN_KEYSTROKES + 1)
         windows, mask = windows_from_keystrokes(pairs)
         self.assertEqual(windows.shape, (2, M, 4))
         self.assertTrue(mask[0].all())
-        self.assertEqual(mask[1].sum(), 1)
-        self.assertTrue(mask[1][0])
-        self.assertFalse(mask[1][1:].any())
+        self.assertEqual(mask[1].sum(), MIN_KEYSTROKES)
+        self.assertTrue(mask[1][:MIN_KEYSTROKES].all())
+        self.assertFalse(mask[1][MIN_KEYSTROKES:].any())
         # padded slots must be zero, not garbage
         self.assertTrue((windows[1][~mask[1]] == 0).all())
 

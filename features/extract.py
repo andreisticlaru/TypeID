@@ -121,6 +121,14 @@ def windows_from_keystrokes(
         windows[i, :length] = features[start:end]
         mask[i, :length] = True
 
+    # Only the last window can be a partial chunk (all earlier ones are a
+    # full M). If that remainder is too thin to trust, drop it rather than
+    # feeding near-empty noise downstream -- the MIN_KEYSTROKES check above
+    # only guarantees the *session* total, not each post-chunking window.
+    if mask[-1].sum() < MIN_KEYSTROKES:
+        windows = windows[:-1]
+        mask = mask[:-1]
+
     return windows, mask
 
 
