@@ -17,14 +17,27 @@ import numpy as np
 class TripletSampler:
     """Load cached Aalto arrays and sample triplets for training."""
 
-    def __init__(self, windows_path: str, mask_path: str, subject_ids_path: str, session_ids_path: str):
+    def __init__(
+        self,
+        windows_path: str,
+        mask_path: str,
+        subject_ids_path: str,
+        session_ids_path: str,
+        subjects: set[str] | None = None,
+    ):
         """Load the four cached .npy arrays from Phase 1.
 
         Parameters
         ----------
         windows_path, mask_path, subject_ids_path, session_ids_path
             Paths to the .npy files from data/build_cache.py output.
+        subjects
+            If given, only these subjects are indexed (and so ever sampled).
+            Used for the subject-disjoint train/eval split; the arrays
+            themselves are not filtered, so row indices still point into the
+            full cache.
         """
+        self.allowed_subjects = subjects
         # TODO: Load all four arrays with np.load()
         # self.windows = ...
         # self.mask = ...
@@ -84,6 +97,8 @@ class TripletSampler:
         for i in range(len(self.subject_ids)):
 
             subject_id = self.subject_ids[i]
+            if self.allowed_subjects is not None and subject_id not in self.allowed_subjects:
+                continue
             session_id = self.session_ids[i]
 
             # Update subject_to_rows
