@@ -8,7 +8,12 @@ Simulates the live system offline on people the model never saw in training:
   3. Rank every gallery entry by cosine similarity to each probe.
   4. Rank-N accuracy = fraction of probes whose true identity is in the top N.
 
-run with: python -m eval.rank_n --num-subjects 1000
+One seed = one random draw of subjects and sessions, which is noisy (~1-2 points).
+Pass several --seeds and read the mean +- std. The same seed picks the same
+subjects/sessions for every checkpoint, so checkpoints are compared like for like.
+
+run with: python -m eval.rank_n --seeds 0 1 2 3 4
+Compare checkpoints: python -m eval.rank_n --checkpoint model/encoder_step90000.pt model/encoder.pt --seeds 0 1 2 3 4
 Add --untrained for a random-weights baseline (should score near chance).
 """
 
@@ -16,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -38,12 +44,26 @@ def load_encoder(checkpoint_path, untrained: bool, device: torch.device) -> Keys
     return model.to(device).eval()  # eval(): dropout off
 
 
-def select_sessions(subject_ids, session_ids, eval_subjects, num_subjects, enroll_sessions, rng):
+def load_eval_data():
+    """Load the cache once; index only the held-out (eval) subjects' rows by (subject, session)."""
+    windows = np.load(PREPROCESSED_PATH / "windows.npy")
+    mask = np.load(PREPROCESSED_PATH / "mask.npy")
+    subject_ids = np.load(PREPROCESSED_PATH / "subject_ids.npy")
+    session_ids = np.load(PREPROCESSED_PATH / "session_ids.npy")
+    eval_subjects = set(json.load(open(DATA_ROOT / "split.json"))["eval_subjects"])
+
+    eval_rows = np.flatnonzero(np.isin(subject_ids, list(eval_subjects)))  # ascending
+    rows_by_session: dict[tuple, list[int]] = {}
+    for i in eval_rows:
+        rows_by_session.setdefault((subject_ids[i], session_ids[i]), []).append(i)
+    return windows, mask, eval_rows, rows_by_session
+
+
+def select_sessions(rows_by_session, num_subjects, enroll_sessions, rng):
     """Return {subject: (enroll_session_ids, probe_session_id)} for sampled eval subjects."""
-    candidate_rows = np.flatnonzero(np.isin(subject_ids, list(eval_subjects)))
-    sessions_by_subject: dict[str, set] = {}
-    for i in candidate_rows:
-        sessions_by_subject.setdefault(subject_ids[i], set()).add(session_ids[i])
+    sessions_by_subject: dict[str, list] = {}
+    for subject, session in rows_by_session:
+        sessions_by_subject.setdefault(subject, []).append(session)
 
     eligible = sorted(s for s, sess in sessions_by_subject.items() if len(sess) >= enroll_sessions + 1)
     chosen = rng.choice(eligible, size=min(num_subjects, len(eligible)), replace=False)
@@ -73,65 +93,66 @@ def pooled_embedding(embeddings: np.ndarray) -> np.ndarray:
     return mean / np.linalg.norm(mean)
 
 
-def evaluate(checkpoint_path=CHECKPOINT_PATH, num_subjects=1000, enroll_sessions=3, seed=0, untrained=False):
-    """Return an int array: for each probe, the 1-based rank of its true identity."""
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = load_encoder(checkpoint_path, untrained, device)
+def ranks_for_seed(embeddings, eval_rows, rows_by_session, seed, num_subjects, enroll_sessions) -> np.ndarray:
+    """For each probe, the 1-based rank of its true identity among the gallery."""
+    plan = select_sessions(rows_by_session, num_subjects, enroll_sessions, np.random.default_rng(seed))
 
-    windows = np.load(PREPROCESSED_PATH / "windows.npy")
-    mask = np.load(PREPROCESSED_PATH / "mask.npy")
-    subject_ids = np.load(PREPROCESSED_PATH / "subject_ids.npy")
-    session_ids = np.load(PREPROCESSED_PATH / "session_ids.npy")
-    eval_subjects = set(json.load(open(DATA_ROOT / "split.json"))["eval_subjects"])
+    def pooled(subject, sessions):
+        rows = np.concatenate([rows_by_session[(subject, s)] for s in sessions])
+        return pooled_embedding(embeddings[np.searchsorted(eval_rows, rows)])
 
-    rng = np.random.default_rng(seed)
-    plan = select_sessions(subject_ids, session_ids, eval_subjects, num_subjects, enroll_sessions, rng)
+    gallery = np.stack([pooled(s, enroll) for s, (enroll, _) in plan.items()])
+    probes = np.stack([pooled(s, [probe]) for s, (_, probe) in plan.items()])
 
-    wanted = {(s, sess) for s, (enroll, probe) in plan.items() for sess in [*enroll, probe]}
-    subject_rows = np.flatnonzero(np.isin(subject_ids, list(plan)))
-    rows_by_session: dict[tuple, list[int]] = {}
-    for i in subject_rows:
-        key = (subject_ids[i], session_ids[i])
-        if key in wanted:
-            rows_by_session.setdefault(key, []).append(i)
-
-    all_rows = np.array(sorted(r for rows in rows_by_session.values() for r in rows))
-    embeddings = embed_rows(model, windows, mask, all_rows, device)
-    emb_of_row = {r: e for r, e in zip(all_rows, embeddings)}
-
-    subjects = list(plan)
-    gallery, probes = [], []
-    for s in subjects:
-        enroll, probe = plan[s]
-        enroll_embs = [emb_of_row[r] for sess in enroll for r in rows_by_session[(s, sess)]]
-        gallery.append(pooled_embedding(np.stack(enroll_embs)))
-        probes.append(pooled_embedding(np.stack([emb_of_row[r] for r in rows_by_session[(s, probe)]])))
-
-    scores = np.stack(probes) @ np.stack(gallery).T  # (num_probes, num_gallery), cosine similarity
+    scores = probes @ gallery.T  # (num_probes, num_gallery), cosine similarity
     true_scores = np.diag(scores)[:, None]
     return 1 + (scores > true_scores).sum(axis=1)
+
+
+def evaluate_model(model, data, device, seeds, num_subjects=1000, enroll_sessions=3) -> list[np.ndarray]:
+    """One ranks array per seed. Embeds all held-out windows once, then reuses them for every seed."""
+    windows, mask, eval_rows, rows_by_session = data
+    embeddings = embed_rows(model, windows, mask, eval_rows, device)
+    return [
+        ranks_for_seed(embeddings, eval_rows, rows_by_session, seed, num_subjects, enroll_sessions)
+        for seed in seeds
+    ]
 
 
 def rank_n_accuracy(ranks: np.ndarray, n: int) -> float:
     return float((ranks <= n).mean())
 
 
+def summarize(ranks_per_seed: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
+    """Mean and std (across seeds) of Rank-N accuracy for each N in RANKS_REPORTED."""
+    table = np.array([[rank_n_accuracy(r, n) for n in RANKS_REPORTED] for r in ranks_per_seed])
+    std = table.std(axis=0, ddof=1) if len(table) > 1 else np.zeros(table.shape[1])
+    return table.mean(axis=0), std
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint", default=str(CHECKPOINT_PATH))
+    parser.add_argument("--checkpoint", nargs="+", default=[str(CHECKPOINT_PATH)])
     parser.add_argument("--num-subjects", type=int, default=1000)
     parser.add_argument("--enroll-sessions", type=int, default=3)
-    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--seeds", type=int, nargs="+", default=[0])
     parser.add_argument("--untrained", action="store_true", help="random-weights baseline")
     args = parser.parse_args()
 
-    ranks = evaluate(args.checkpoint, args.num_subjects, args.enroll_sessions, args.seed, args.untrained)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    data = load_eval_data()
 
-    label = "untrained baseline" if args.untrained else args.checkpoint
-    print(f"{label}: {len(ranks)} gallery subjects, {args.enroll_sessions} enroll sessions each")
-    for n in RANKS_REPORTED:
-        print(f"  Rank-{n:<3d} {rank_n_accuracy(ranks, n):6.1%}")
-    print(f"  chance Rank-1 = {1 / len(ranks):.2%}, median rank = {int(np.median(ranks))}")
+    runs = [("untrained", None)] if args.untrained else [(Path(c).name, c) for c in args.checkpoint]
+
+    print(f"gallery={args.num_subjects} subjects, {args.enroll_sessions} enroll sessions, "
+          f"{len(args.seeds)} seed(s); Rank-N accuracy % (mean  +- std across seeds)")
+    print(f"{'checkpoint':<26}" + "".join(f"{'Rank-' + str(n):>16}" for n in RANKS_REPORTED))
+    for label, path in runs:
+        model = load_encoder(path, args.untrained, device)
+        ranks_per_seed = evaluate_model(model, data, device, args.seeds, args.num_subjects, args.enroll_sessions)
+        mean, std = summarize(ranks_per_seed)
+        print(f"{label:<26}" + "".join(f"{100 * m:>9.1f}  +- {100 * s:<4.1f}" for m, s in zip(mean, std)))
+    print(f"chance Rank-1 = {1 / args.num_subjects:.2%}")
 
 
 if __name__ == "__main__":

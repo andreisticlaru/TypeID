@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TypeID Progress</title>
+<!--
+  To log new progress: copy a <section class="milestone"> block to the TOP of #timeline and set
+  its id, data-date (short label for the scrubber), data-title (bubble text), and content.
+  The scrubber on the right builds itself from the milestone sections. Newest first.
+-->
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb;
+    --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --wash: #f0efec; --good: #006300;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19;
+      --ink: #ffffff; --ink2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+      --wash: #262624; --good: #0ca30c;
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19;
+    --ink: #ffffff; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --wash: #262624; --good: #0ca30c;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 36px 20px 72px; }
+  h1 { font-size: 26px; line-height: 1.2; margin: 0 0 6px; font-weight: 650; letter-spacing: -0.01em; }
+  h2 { font-size: 21px; line-height: 1.25; margin: 0 0 4px; font-weight: 650; letter-spacing: -0.01em; }
+  h3 { font-size: 16px; margin: 0 0 4px; font-weight: 650; }
+  h4 { font-size: 15px; margin: 0 0 8px; font-weight: 650; }
+  p { margin: 0 0 10px; }
+  .sub { color: var(--ink2); margin: 0 0 30px; max-width: 70ch; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 22px; min-width: 0;
+  }
+  .stack { display: grid; gap: 18px; }
+  .cap { color: var(--ink2); font-size: 13.5px; margin: 0; }
+  .muted { color: var(--muted); }
+
+  /* timeline sections */
+  .milestone { position: relative; padding-left: 30px; margin-bottom: 46px; }
+  .milestone::before { content: ""; position: absolute; left: 5px; top: 14px; bottom: -46px; width: 2px; background: var(--grid); }
+  #timeline > .milestone:last-child::before { bottom: 0; }
+  #timeline > .milestone:last-child { min-height: 70vh; margin-bottom: 0; }
+  .m-dot { position: absolute; left: 0; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--surface); border: 2px solid var(--s1); }
+  .m-head { margin-bottom: 14px; }
+  .m-date { color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+  .m-lede { color: var(--ink2); margin: 4px 0 0; max-width: 72ch; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink2); margin-left: 8px; text-transform: none; letter-spacing: 0; vertical-align: 1px; }
+  .facts { margin: 0; padding-left: 20px; }
+  .facts li { margin-bottom: 7px; }
+  .facts li:last-child { margin-bottom: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .chip { font-size: 12.5px; padding: 3px 10px; border-radius: 999px; background: var(--wash); color: var(--ink2); }
+  .chip b { color: var(--ink); font-weight: 650; }
+  .chip.mono { font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
+
+  /* hero + tiles */
+  .top { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr); gap: 18px; margin-bottom: 18px; }
+  .hero-label { color: var(--ink2); font-size: 14px; margin-bottom: 4px; }
+  .hero-value { font-size: 76px; line-height: 1; font-weight: 650; letter-spacing: -0.03em; }
+  .delta { color: var(--good); font-size: 13.5px; font-weight: 600; margin-top: 8px; }
+  .hero-note { color: var(--ink2); font-size: 13.5px; margin-top: 10px; }
+  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .tile { padding: 16px 18px; }
+  .tile-label { color: var(--ink2); font-size: 13.5px; }
+  .tile-value { font-size: 30px; font-weight: 650; line-height: 1.2; letter-spacing: -0.02em; }
+  .tile .delta { margin-top: 2px; font-size: 12.5px; }
+  .tile .tile-note { color: var(--ink2); font-size: 12.5px; }
+
+  /* chart cards */
+  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    font: inherit; font-size: 13px; padding: 5px 12px; border: 0; cursor: pointer;
+    background: transparent; color: var(--ink2);
+  }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--wash); color: var(--ink); font-weight: 600; }
+  .seg button:focus-visible, .chart-root:focus-visible, .scrub-tick:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 4px 0 8px; font-size: 13px; color: var(--ink2); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .key { display: inline-block; width: 16px; height: 2px; border-radius: 1px; }
+  .chart-wrap { position: relative; }
+  .chart-root { width: 100%; min-width: 0; position: relative; }
+  .chart-root svg { display: block; max-width: 100%; }
+  .gridline { stroke: var(--grid); stroke-width: 1; }
+  .axisline { stroke: var(--axis); stroke-width: 1; }
+  .tick { fill: var(--muted); font-size: 12px; }
+  .ring { stroke: var(--surface); stroke-width: 2; }
+  .xhair { stroke: var(--axis); stroke-width: 1; }
+  .endname { fill: var(--ink2); font-size: 12px; }
+  .endval { fill: var(--ink); font-size: 12px; font-weight: 650; }
+  .tip {
+    position: absolute; pointer-events: none; z-index: 2; display: none;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 12px; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,0.12); white-space: nowrap;
+  }
+  .tip-h { color: var(--ink2); margin-bottom: 4px; }
+  .tip-r { display: flex; align-items: center; gap: 8px; line-height: 1.6; }
+  .tip-r strong { color: var(--ink); font-weight: 650; min-width: 4.6em; }
+  .tip-r .n { color: var(--ink2); }
+
+  /* tables */
+  .tscroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 7px 12px; text-align: right; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--ink2); font-weight: 600; font-size: 13px; }
+  tr.final td { background: var(--wash); font-weight: 650; }
+
+  /* explanations */
+  .sec-title { margin: 30px 0 12px; }
+  .explain { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 18px; }
+  .explain ul, .explain ol { margin: 0 0 4px; padding-left: 20px; }
+  .explain li { margin-bottom: 6px; }
+  .explain .card p:last-child, .explain .card ul:last-child, .explain .card ol:last-child { margin-bottom: 0; }
+  code { font: 12.5px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; background: var(--wash); padding: 2px 6px; border-radius: 5px; }
+  pre { margin: 6px 0 0; padding: 10px 12px; background: var(--wash); border-radius: 8px; overflow-x: auto; font: 12.5px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
+  .foot { margin-top: 18px; }
+
+  /* scrubber (Google Photos style date bar) */
+  .scrub { position: fixed; right: 6px; top: 84px; bottom: 28px; width: 92px; z-index: 20; user-select: none; -webkit-user-select: none; touch-action: none; }
+  .scrub-track { position: absolute; right: 14px; top: 0; bottom: 0; width: 2px; background: var(--grid); border-radius: 1px; }
+  .scrub-hit { position: absolute; right: 0; top: -10px; bottom: -10px; width: 30px; cursor: grab; }
+  .scrub.dragging .scrub-hit { cursor: grabbing; }
+  .scrub-tick {
+    position: absolute; right: 0; transform: translateY(-50%); z-index: 1;
+    display: flex; align-items: center; gap: 9px; padding: 3px 0 3px 8px;
+    font-size: 12px; color: var(--muted); text-decoration: none; white-space: nowrap;
+  }
+  .scrub-tick .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--axis); margin-right: 11px; flex: none; }
+  .scrub-tick:hover { color: var(--ink); }
+  .scrub-tick.active { color: var(--ink); font-weight: 650; }
+  .scrub-tick.active .dot { background: var(--s1); }
+  .scrub-thumb { position: absolute; right: 7px; width: 16px; height: 34px; border-radius: 8px; background: var(--s1); transform: translateY(-50%); pointer-events: none; z-index: 2; box-shadow: 0 0 0 2px var(--page); }
+  .scrub-bubble {
+    position: absolute; right: 26px; top: 50%; transform: translateY(-50%);
+    background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+    border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; white-space: nowrap;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.14); opacity: 0; transition: opacity 0.15s; pointer-events: none;
+  }
+  .scrub.show .scrub-bubble, .scrub:hover .scrub-bubble { opacity: 1; }
+
+  @media (max-width: 1240px) { .wrap { padding-right: 104px; } }
+  @media (max-width: 760px) {
+    .wrap { padding-left: 14px; padding-right: 46px; }
+    .milestone { padding-left: 22px; }
+    .top { grid-template-columns: minmax(0, 1fr); }
+    .hero-value { font-size: 60px; }
+    .scrub { width: 36px; right: 2px; }
+    .scrub-tick .lbl { display: none; }
+    .scrub-tick { padding-left: 0; }
+  }
+</style>
+</head>
+<body>
+<nav class="scrub" id="scrub" aria-label="Project timeline: jump to a milestone">
+  <div class="scrub-track"></div>
+  <div class="scrub-hit" id="scrub-hit" aria-hidden="true"></div>
+  <div class="scrub-thumb" id="scrub-thumb"><div class="scrub-bubble" id="scrub-bubble"></div></div>
+</nav>
+
+<div class="wrap">
+  <h1>TypeID progress</h1>
+  <p class="sub">Keystroke biometrics: an open-set identification model trained on the Aalto dataset. Milestones run newest first. Use the bar on the right to scroll through them, or click a date to jump.</p>
+
+  <div id="timeline">
+
+  <!-- ===================== Sep 21: first results ===================== -->
+  <section class="milestone" id="m-results" data-date="Sep 21" data-title="First results">
+    <span class="m-dot"></span>
+    <div class="m-head">
+      <div class="m-date">Sep 21, 2026 <span class="tag">multi-seed eval and this page not yet committed</span></div>
+      <h2>First results: the 200k-step model on held-out people</h2>
+      <p class="m-lede" id="subtitle"></p>
+    </div>
+
+    <div class="top">
+      <div class="card">
+        <div class="hero-label">Rank-1 accuracy: the correct person is the system's top pick</div>
+        <div class="hero-value" id="hero-value"></div>
+        <div class="delta" id="hero-delta"></div>
+        <div class="hero-note" id="hero-note"></div>
+      </div>
+      <div class="tiles" id="tiles"></div>
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Accuracy vs. training steps</h3>
+            <p class="cap">Mean over 10 random draws of 1,000 held-out subjects. Step 0 is the untrained model. Hover for values and spread.</p>
+          </div>
+          <div class="seg" role="group" aria-label="View" data-target="c1">
+            <button type="button" data-view="chart" aria-pressed="true">Chart</button>
+            <button type="button" data-view="table" aria-pressed="false">Table</button>
+          </div>
+        </div>
+        <div id="c1-chart">
+          <div class="legend" id="c1-legend"></div>
+          <div class="chart-wrap"><div class="chart-root" id="c1-root" tabindex="0" aria-label="Line chart of Rank-N accuracy by training step. Use left and right arrow keys to read values."></div><div class="tip" id="c1-tip"></div></div>
+        </div>
+        <div id="c1-table" hidden><div class="tscroll" id="c1-table-body"></div><p class="cap" style="margin-top:10px">Mean ± standard deviation across 10 draws, in %. Median true rank = median position of the correct person among the 1,000 enrolled (1 is best), averaged over draws.</p></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Cumulative match curve (CMC)</h3>
+            <p class="cap">How often the correct person appears within the top N candidates, for the final model and an untrained model. Mean over 10 draws.</p>
+          </div>
+          <div class="seg" role="group" aria-label="View" data-target="c2">
+            <button type="button" data-view="chart" aria-pressed="true">Chart</button>
+            <button type="button" data-view="table" aria-pressed="false">Table</button>
+          </div>
+        </div>
+        <div id="c2-chart">
+          <div class="legend" id="c2-legend"></div>
+          <div class="chart-wrap"><div class="chart-root" id="c2-root" tabindex="0" aria-label="Line chart of cumulative match accuracy by number of candidates N. Use left and right arrow keys to read values."></div><div class="tip" id="c2-tip"></div></div>
+        </div>
+        <div id="c2-table" hidden><div class="tscroll" id="c2-table-body"></div></div>
+      </div>
+    </div>
+
+    <h3 class="sec-title">How to read this</h3>
+    <div class="explain">
+      <div class="card">
+        <h4>What is being tested</h4>
+        <p><strong>Identification (1:N).</strong> Given typing from an unknown person, rank everyone enrolled from most to least similar and see where the true person lands.</p>
+        <p>This is not <strong>verification</strong> (1:1, "is this who they claim to be?"), which is scored with EER. Published verification numbers are not comparable to Rank-N accuracy here.</p>
+      </div>
+      <div class="card">
+        <h4>How the test runs</h4>
+        <ol>
+          <li>Take 1,000 subjects the model never saw in training, drawn from the 16,859 held-out subjects.</li>
+          <li>Enroll each with 3 typing sessions (one typed sentence each). Their embeddings are averaged into one profile.</li>
+          <li>Query with one more session per subject, a different sentence from any used for enrollment, so the model can't lean on content.</li>
+          <li>Rank all 1,000 profiles by cosine similarity to each query.</li>
+          <li>Repeat with 10 different random draws (seeds) and average.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h4>Reading Rank-N</h4>
+        <p id="explain-rank"></p>
+        <p>Pure chance would give N/1,000: 0.1% at Rank-1 and 2% at Rank-20. Even an untrained network beats chance, because raw timing features carry some signal. The gap between the untrained and trained rows is what training added.</p>
+      </div>
+      <div class="card">
+        <h4>What the ± means</h4>
+        <p>The standard deviation across the 10 draws: how much a score moves when a different random set of 1,000 subjects and sessions is used.</p>
+        <p id="explain-pm"></p>
+        <p>The mean of the 10 draws is tighter than a single draw. Every checkpoint is scored on the same draws, so comparisons between checkpoints are cleaner than the ± suggests.</p>
+      </div>
+      <div class="card">
+        <h4>What the curve shows</h4>
+        <p id="explain-curve"></p>
+      </div>
+      <div class="card">
+        <h4>Caveats</h4>
+        <ul>
+          <li>Each query is a single typed sentence, usually one window of at most 50 keystrokes. That is a short sample. Combining several sessions per query would score higher, so this test is deliberately strict.</li>
+          <li>Scores are for this protocol only: a gallery of 1,000 and 3 enrollment sessions. Larger galleries score lower.</li>
+          <li>The same held-out pool was used to compare checkpoints, so the best-checkpoint number is slightly optimistic.</li>
+          <li>Data is the Aalto copy-typing task. Freely composed text is untested.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Not yet tried</h4>
+        <ul>
+          <li><strong>Hard negative mining.</strong> Random negatives are mostly easy, so many training triplets probably contribute no gradient.</li>
+          <li><strong>Protocol sensitivity.</strong> More enrollment sessions or several probe sessions per query.</li>
+          <li><strong>Verification EER</strong>, to compare with published verification results.</li>
+          <li><strong>Margin and learning-rate tuning.</strong></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card foot">
+      <h4>Setup and how to reproduce</h4>
+      <p class="cap" id="setup"></p>
+      <pre>python -m eval.rank_n --checkpoint model/encoder.pt --seeds 0 1 2 3 4 5 6 7 8 9</pre>
+    </div>
+  </section>
+
+  <!-- ===================== Sep 20: first training run ===================== -->
+  <section class="milestone" id="m-training" data-date="Sep 20" data-title="First full training run">
+    <span class="m-dot"></span>
+    <div class="m-head">
+      <div class="m-date">Sep 20, 2026</div>
+      <h2>First full training run</h2>
+      <p class="m-lede">The encoder was trained for the first time, and a held-out evaluation was built to measure it.</p>
+    </div>
+    <div class="card">
+      <ul class="facts">
+        <li>Trained the encoder from random weights: a 20,000-step trial first, then a full <strong>200,000-step</strong> run (batches of 64 triplets, Adam, learning rate 1e-3), saving a checkpoint every 10,000 steps. The full run took about 1 h 57 min (21:14 to 23:11).</li>
+        <li>First held-out evaluation of the 20k-step model, on one draw of 1,000 unseen subjects: <strong>Rank-1 17.7%</strong> and Rank-20 70.6%, against 4.6% and 28.6% for an untrained model.</li>
+        <li>Sped up the triplet sampler from about <strong>79 ms to 0.1 ms</strong> per triplet. A 150,000-item Python list was being converted to an array on every call.</li>
+        <li>Added the Rank-N evaluation script (<code>eval/rank_n.py</code>), <code>--save-every</code> numbered checkpoints, and checkpoints that bundle the weights with their settings. A <code>--resume</code> option (continue from a checkpoint, including Adam's state) was added afterwards and is not committed yet.</li>
+        <li>Debugged <code>train.py</code> with a 200-step smoke test first: wrong batch key names, missing imports, a nonexistent attribute. Training loss on the test fell from 0.228 to 0.205.</li>
+      </ul>
+      <div class="chips">
+        <span class="chip"><b>217,216</b> parameters</span>
+        <span class="chip"><b>12.8M</b> anchors sampled</span>
+        <span class="chip mono">5fe9d05</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Sep 18: split ===================== -->
+  <section class="milestone" id="m-split" data-date="Sep 18" data-title="Subject-disjoint split">
+    <span class="m-dot"></span>
+    <div class="m-head">
+      <div class="m-date">Sep 18, 2026</div>
+      <h2>Train and evaluation people kept strictly separate</h2>
+      <p class="m-lede">Evaluation must test people the model has never seen, so the split is by subject, not by sample.</p>
+    </div>
+    <div class="card">
+      <ul class="facts">
+        <li>Split the Aalto subjects 90/10 with a fixed seed (42): <strong>151,734 training</strong> subjects and <strong>16,859 held-out</strong> subjects.</li>
+        <li>Saved the split to <code>data/split.json</code> so training and evaluation always use the identical held-out people, even if the cache is rebuilt.</li>
+        <li><code>TripletSampler</code> takes an optional subject allowlist and skips other subjects while indexing. The data arrays are not copied.</li>
+      </ul>
+      <div class="chips">
+        <span class="chip"><b>151,734</b> train subjects</span>
+        <span class="chip"><b>16,859</b> held-out subjects</span>
+        <span class="chip mono">1e8a52e</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Sep 14: sampler finished, data cleaned ===================== -->
+  <section class="milestone" id="m-clean" data-date="Sep 14" data-title="Sampler finished, data cleaned">
+    <span class="m-dot"></span>
+    <div class="m-head">
+      <div class="m-date">Sep 14, 2026</div>
+      <h2>Sampler finished, and a hidden data problem fixed</h2>
+      <p class="m-lede">Finishing the sampler exposed windows that held almost no typing.</p>
+    </div>
+    <div class="card">
+      <ul class="facts">
+        <li>Finished <code>sample_triplet</code> and <code>sample_batch</code>: anchor and positive from the same person in different sessions, negative from a different person.</li>
+        <li>Found that some windows held only a few real keystrokes (as few as 1 of 50). The 25-keystroke minimum only checked whole sessions, so the leftover tail of a long session slipped through as a near-empty window.</li>
+        <li>The extractor now drops any tail window under 25 keystrokes, and the training cache was rebuilt: <strong>3,343,148 to 2,483,167 windows</strong>, every one with at least 25 real keystrokes.</li>
+      </ul>
+      <div class="chips">
+        <span class="chip"><b>3.34M → 2.48M</b> windows</span>
+        <span class="chip"><b>12</b> unit tests</span>
+        <span class="chip mono">354aa79</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Sep 10: sampler foundation ===================== -->
+  <section class="milestone" id="m-sampler" data-date="Sep 10" data-title="Triplet sampler foundation">
+    <span class="m-dot"></span>
+    <div class="m-head">
+      <div class="m-date">Sep 10, 2026</div>
+      <h2>Triplet sampler foundation</h2>
+    </div>
+    <div class="card">
+      <ul class="facts">
+        <li>Started <code>TripletSampler</code>: loads the four cached arrays and builds lookups from subject to windows, and from (subject, session) to windows, so triplets can be drawn without rescanning millions of rows.</li>
+        <li>Key data fact learned: one row is one <em>window</em>, and a long session can span several windows that share a session ID.</li>
+      </ul>
+      <div class="chips"><span class="chip mono">be10fcc</span></div>
+    </div>
+  </section>
+
+  <!-- ===================== Sep 9: encoder and loss ===================== -->
+  <section class="milestone" id="m-model" data-date="Sep 9" data-title="Encoder and loss">
+    <span class="m-dot"></span>
+    <div class="m-head">
+      <div class="m-date">Sep 7 to 9, 2026</div>
+      <h2>Encoder and triplet loss</h2>
+    </div>
+    <div class="card">
+      <ul class="facts">
+        <li>Built the encoder (Sep 7): two stacked LSTMs (128) over the 50-keystroke window, masked mean-pooling so padding is ignored, a Dense(128) layer, and L2 normalization.</li>
+        <li>Implemented cosine distance and the triplet loss (Sep 9), margin 0.5.</li>
+        <li>Sketched the sampler structure, and added the README banner and logo.</li>
+      </ul>
+      <div class="chips">
+        <span class="chip mono">42252b8</span><span class="chip mono">e4c27ff</span><span class="chip mono">d9349c2</span><span class="chip mono">1b2e307</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Sep 5: features cached ===================== -->
+  <section class="milestone" id="m-cache" data-date="Sep 5" data-title="Features cached">
+    <span class="m-dot"></span>
+    <div class="m-head">
+      <div class="m-date">Sep 5, 2026</div>
+      <h2>Aalto features extracted and cached</h2>
+    </div>
+    <div class="card">
+      <ul class="facts">
+        <li>Ran the feature extractor over the whole Aalto dataset and saved the windows to disk so training doesn't recompute them: 168,593 participants, 2,280,166 sessions kept and 248,729 skipped as too short, about 36 minutes.</li>
+        <li>Wrote the pipeline explanations into <code>ARCHITECTURE.md</code>.</li>
+        <li>Superseded on Sep 14, when the cache was rebuilt with the per-window minimum.</li>
+      </ul>
+      <div class="chips"><span class="chip mono">5ea1c78</span></div>
+    </div>
+  </section>
+
+  <!-- ===================== Aug 14: extractor and loader ===================== -->
+  <section class="milestone" id="m-features" data-date="Aug 14" data-title="Feature extraction and data loader">
+    <span class="m-dot"></span>
+    <div class="m-head">
+      <div class="m-date">Aug 14 to 19, 2026</div>
+      <h2>Feature extraction and data loading</h2>
+    </div>
+    <div class="card">
+      <ul class="facts">
+        <li>Wrote the canonical feature extractor (<code>features/extract.py</code>), the single code path used for both training and live capture, plus the Aalto data loader.</li>
+        <li>Moved the capture UI from vanilla JS to React, split the docs into README, ARCHITECTURE and CLAUDE, and added the TODO tracker and data-protection notes.</li>
+        <li>Aug 19: added support for processing the full dataset.</li>
+      </ul>
+      <div class="chips">
+        <span class="chip mono">f4afdf3</span><span class="chip mono">b04f6f8</span><span class="chip mono">22dcd13</span><span class="chip mono">9101ca8</span><span class="chip mono">1364669</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Jul 17: scaffold ===================== -->
+  <section class="milestone" id="m-start" data-date="Jul 17" data-title="Project scaffold">
+    <span class="m-dot"></span>
+    <div class="m-head">
+      <div class="m-date">Jul 17 to 30, 2026</div>
+      <h2>Project scaffold</h2>
+    </div>
+    <div class="card">
+      <ul class="facts">
+        <li>Jul 17: initial commit.</li>
+        <li>Jul 30: scaffolded the FastAPI backend and the first feature-extraction module, moved the frontend to Vite and Tailwind, wrote the README, and added notes on free-text composition and forensic use as future work.</li>
+      </ul>
+      <div class="chips">
+        <span class="chip mono">53a64b4</span><span class="chip mono">95daa2a</span><span class="chip mono">b58d44a</span><span class="chip mono">23c2c2f</span><span class="chip mono">91bd218</span>
+      </div>
+    </div>
+  </section>
+
+  </div>
+</div>
+
+<script>
+const DATA = {"ranks":[1,5,10,20],"cmc_n":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50],"seeds":10,"runs":[{"mean":[5.44,14.38,20.35,28.83],"std":[0.79,1.06,1.28,1.17],"median_rank":65.85,"cmc":[5.44,8.32,10.8,12.64,14.38,15.89,17.16,18.14,19.3,20.35,21.46,22.43,23.34,24.38,25.18,25.96,26.71,27.57,28.2,28.83,29.65,30.47,31.08,31.75,32.25,32.81,33.47,33.99,34.57,35.13,35.75,36.32,36.81,37.42,38.05,38.55,38.93,39.44,39.93,40.29,40.68,41.16,41.59,42.03,42.39,42.79,43.29,43.68,43.97,44.31],"label":"untrained","step":0},{"mean":[15.87,38.96,51.96,66.56],"std":[1.29,1.56,1.22,1.69],"median_rank":9.45,"cmc":[15.87,24.15,30.48,34.93,38.96,41.97,45.05,47.64,50.08,51.96,53.8,55.6,57.09,58.49,60.16,61.58,63.11,64.36,65.49,66.56,67.59,68.51,69.43,70.21,71.11,71.76,72.51,73.29,73.94,74.67,75.32,75.95,76.46,77.02,77.62,78.13,78.68,79.25,79.7,80.11,80.54,81.05,81.46,81.96,82.3,82.83,83.2,83.58,84.11,84.44],"label":"step 10000","step":10000},{"mean":[18.01,42.63,55.94,69.94],"std":[1.75,1.26,1.57,0.68],"median_rank":8.0,"cmc":[18.01,27.44,33.66,38.59,42.63,45.83,48.82,51.34,53.81,55.94,57.81,59.59,61.27,62.88,64.27,65.45,66.7,67.95,68.92,69.94,70.83,71.87,72.62,73.41,74.12,74.92,75.69,76.38,77.0,77.56,78.05,78.65,79.16,79.68,80.16,80.62,81.14,81.69,82.02,82.48,82.86,83.22,83.64,84.04,84.35,84.7,85.07,85.38,85.7,86.08],"label":"step 20000","step":20000},{"mean":[22.27,50.05,63.88,76.92],"std":[1.48,1.14,1.51,1.09],"median_rank":5.6,"cmc":[22.27,33.13,40.3,45.75,50.05,53.31,56.7,59.51,61.76,63.88,65.89,67.65,69.17,70.64,71.93,72.89,74.11,75.17,76.09,76.92,77.79,78.6,79.34,79.96,80.65,81.32,81.9,82.57,83.1,83.8,84.3,84.87,85.44,85.89,86.26,86.78,87.04,87.42,87.76,88.05,88.45,88.78,89.08,89.48,89.78,90.06,90.27,90.51,90.77,90.94],"label":"step 30000","step":30000},{"mean":[21.47,49.17,62.82,76.62],"std":[1.54,1.47,1.67,1.19],"median_rank":5.9,"cmc":[21.47,32.4,39.8,45.1,49.17,52.42,55.38,58.56,60.93,62.82,64.88,66.38,67.86,69.43,70.77,72.0,73.34,74.45,75.6,76.62,77.47,78.2,78.86,79.65,80.42,81.12,81.58,82.29,82.86,83.36,83.91,84.31,84.82,85.25,85.6,85.99,86.35,86.72,87.19,87.46,87.8,88.1,88.48,88.8,89.05,89.33,89.6,89.94,90.23,90.53],"label":"step 40000","step":40000},{"mean":[23.53,51.84,65.52,78.71],"std":[1.45,1.98,1.4,1.31],"median_rank":5.05,"cmc":[23.53,34.44,41.53,47.37,51.84,55.36,58.53,61.28,63.66,65.52,67.26,68.86,70.47,72.18,73.6,74.76,75.82,76.93,77.76,78.71,79.62,80.44,81.24,81.9,82.57,83.05,83.92,84.48,85.07,85.55,85.88,86.28,86.76,87.24,87.68,88.03,88.37,88.62,89.08,89.4,89.73,89.95,90.28,90.6,90.92,91.09,91.28,91.43,91.64,91.83],"label":"step 50000","step":50000},{"mean":[23.99,52.42,67.07,80.08],"std":[0.95,1.2,1.31,1.19],"median_rank":5.1,"cmc":[23.99,34.67,42.13,48.02,52.42,56.66,60.0,62.57,65.02,67.07,68.84,70.32,71.84,73.09,74.58,75.75,76.93,78.06,78.95,80.08,80.87,81.73,82.54,83.16,83.68,84.29,84.77,85.28,85.81,86.23,86.81,87.31,87.63,88.08,88.52,88.82,89.1,89.49,89.8,90.12,90.44,90.67,90.88,91.15,91.44,91.6,91.84,92.02,92.22,92.47],"label":"step 60000","step":60000},{"mean":[25.02,53.62,67.55,80.02],"std":[1.51,1.21,1.99,1.25],"median_rank":4.8,"cmc":[25.02,36.39,43.56,49.11,53.62,57.53,60.56,63.27,65.51,67.55,69.69,71.4,72.84,74.12,75.16,76.32,77.41,78.29,79.2,80.02,80.81,81.76,82.36,83.1,83.67,84.26,84.79,85.38,85.83,86.23,86.76,87.13,87.58,87.98,88.37,88.65,89.06,89.48,89.72,90.0,90.31,90.66,90.88,91.12,91.35,91.57,91.83,92.1,92.32,92.5],"label":"step 70000","step":70000},{"mean":[26.0,54.37,67.91,80.76],"std":[1.25,1.41,1.18,0.71],"median_rank":4.4,"cmc":[26.0,37.1,44.35,50.19,54.37,57.77,61.05,63.59,66.01,67.91,69.44,71.36,72.91,74.34,75.62,76.79,77.96,78.94,79.83,80.76,81.62,82.2,82.98,83.61,84.36,84.87,85.45,85.98,86.5,86.95,87.39,87.79,88.29,88.71,89.08,89.38,89.73,90.08,90.38,90.72,90.96,91.19,91.42,91.69,91.88,92.11,92.32,92.57,92.81,93.01],"label":"step 80000","step":80000},{"mean":[26.99,56.65,70.76,82.39],"std":[0.86,1.19,1.25,0.83],"median_rank":4.0,"cmc":[26.99,39.07,47.11,52.65,56.65,60.15,63.3,66.19,68.53,70.76,72.44,73.95,75.19,76.52,77.56,78.62,79.6,80.57,81.52,82.39,83.08,83.7,84.48,85.04,85.59,85.99,86.55,87.16,87.56,88.07,88.54,88.88,89.15,89.51,89.83,90.21,90.49,90.86,91.13,91.36,91.66,92.04,92.34,92.59,92.78,92.95,93.13,93.26,93.49,93.75],"label":"step 90000","step":90000},{"mean":[27.15,56.4,69.85,82.3],"std":[1.37,1.13,1.38,1.06],"median_rank":4.1,"cmc":[27.15,38.66,46.32,52.06,56.4,59.98,62.9,65.68,67.74,69.85,71.59,73.17,74.52,76.02,77.39,78.51,79.51,80.5,81.38,82.3,83.09,83.76,84.37,85.11,85.62,86.14,86.72,87.25,87.72,88.32,88.7,89.0,89.42,89.71,89.99,90.21,90.5,90.85,91.08,91.37,91.6,92.02,92.25,92.51,92.76,92.99,93.23,93.45,93.62,93.77],"label":"step 100000","step":100000},{"mean":[27.33,56.98,70.54,82.41],"std":[1.23,1.64,1.54,0.85],"median_rank":4.0,"cmc":[27.33,39.23,46.93,52.38,56.98,60.57,63.71,66.26,68.44,70.54,72.29,73.71,75.14,76.47,77.8,78.87,79.93,80.9,81.77,82.41,83.21,83.91,84.5,85.24,85.75,86.38,86.84,87.3,87.84,88.27,88.71,89.09,89.48,89.74,90.0,90.17,90.37,90.71,90.94,91.29,91.59,91.87,92.12,92.37,92.6,92.83,93.06,93.28,93.52,93.68],"label":"step 110000","step":110000},{"mean":[28.7,58.38,71.53,83.19],"std":[1.29,0.99,1.29,1.2],"median_rank":4.0,"cmc":[28.7,40.85,48.19,53.94,58.38,61.95,64.89,67.39,69.66,71.53,73.3,74.97,76.25,77.54,78.7,79.92,80.88,81.77,82.53,83.19,84.02,84.71,85.33,85.88,86.47,87.01,87.68,88.13,88.65,89.1,89.46,89.79,90.11,90.53,90.91,91.18,91.42,91.67,91.95,92.1,92.27,92.5,92.71,93.03,93.27,93.51,93.67,93.87,93.97,94.18],"label":"step 120000","step":120000},{"mean":[27.6,57.97,70.96,82.81],"std":[1.48,1.49,1.65,1.27],"median_rank":3.95,"cmc":[27.6,39.53,47.8,53.56,57.97,61.19,64.08,66.65,68.85,70.96,72.8,74.36,75.93,77.21,78.44,79.5,80.47,81.31,82.11,82.81,83.63,84.39,85.01,85.73,86.39,86.99,87.55,88.13,88.59,88.99,89.33,89.7,90.05,90.34,90.64,91.09,91.35,91.63,91.86,92.17,92.39,92.6,92.86,93.07,93.28,93.45,93.65,93.87,94.03,94.22],"label":"step 130000","step":130000},{"mean":[28.34,58.42,71.53,83.16],"std":[1.25,1.4,1.07,1.09],"median_rank":3.75,"cmc":[28.34,40.49,48.53,53.86,58.42,61.89,64.84,67.36,69.65,71.53,73.23,74.77,76.22,77.48,78.54,79.55,80.56,81.45,82.42,83.16,83.84,84.62,85.28,85.88,86.71,87.26,87.82,88.37,88.84,89.22,89.62,90.07,90.47,90.68,91.03,91.36,91.61,91.9,92.16,92.41,92.62,92.86,93.1,93.3,93.56,93.77,94.01,94.2,94.38,94.5],"label":"step 140000","step":140000},{"mean":[28.03,57.99,71.61,83.07],"std":[1.37,1.35,1.13,0.81],"median_rank":4.0,"cmc":[28.03,39.8,47.52,53.45,57.99,61.58,64.81,67.29,69.45,71.61,73.35,74.7,76.2,77.75,78.99,80.01,80.81,81.67,82.42,83.07,83.79,84.54,85.21,85.82,86.4,86.97,87.48,88.05,88.53,89.05,89.47,89.78,90.07,90.33,90.68,90.94,91.24,91.56,91.87,92.11,92.39,92.61,92.81,93.02,93.23,93.4,93.49,93.65,93.77,94.06],"label":"step 150000","step":150000},{"mean":[27.61,58.04,71.28,83.27],"std":[1.59,1.75,1.65,0.83],"median_rank":4.0,"cmc":[27.61,39.5,47.68,53.48,58.04,61.6,64.68,67.16,69.37,71.28,73.08,74.78,76.03,77.2,78.54,79.72,80.69,81.56,82.43,83.27,84.02,84.81,85.47,86.15,86.7,87.19,87.71,88.19,88.61,88.94,89.21,89.58,90.0,90.38,90.66,90.96,91.37,91.62,91.87,92.1,92.41,92.67,92.85,93.07,93.31,93.51,93.74,94.03,94.23,94.43],"label":"step 160000","step":160000},{"mean":[28.28,58.05,71.85,83.7],"std":[1.27,1.39,1.48,1.54],"median_rank":3.9,"cmc":[28.28,40.11,47.96,53.7,58.05,61.64,64.69,67.34,69.83,71.85,73.66,75.23,76.76,78.2,79.34,80.26,81.17,81.98,82.94,83.7,84.33,84.92,85.66,86.31,86.86,87.36,87.83,88.3,88.71,89.24,89.56,89.92,90.38,90.65,90.97,91.24,91.55,91.89,92.14,92.44,92.66,92.91,93.16,93.39,93.6,93.83,94.01,94.15,94.28,94.42],"label":"step 170000","step":170000},{"mean":[28.61,58.88,72.3,83.78],"std":[1.1,1.39,1.55,1.0],"median_rank":4.0,"cmc":[28.61,40.88,48.66,54.41,58.88,62.36,65.43,67.98,70.35,72.3,74.1,75.62,77.03,78.3,79.5,80.46,81.4,82.24,83.1,83.78,84.42,85.16,85.67,86.2,86.65,87.2,87.78,88.24,88.69,89.06,89.51,89.93,90.33,90.72,91.07,91.38,91.78,91.98,92.25,92.52,92.74,93.04,93.25,93.48,93.7,93.9,94.15,94.35,94.48,94.67],"label":"step 180000","step":180000},{"mean":[28.41,58.57,72.25,84.01],"std":[1.28,1.53,1.3,0.97],"median_rank":3.75,"cmc":[28.41,40.96,48.7,54.3,58.57,62.37,65.61,68.05,70.41,72.25,74.0,75.62,76.97,78.23,79.43,80.55,81.63,82.46,83.25,84.01,84.87,85.54,86.25,86.75,87.24,87.79,88.15,88.58,88.99,89.44,89.8,90.22,90.63,91.06,91.35,91.59,91.89,92.05,92.41,92.72,92.94,93.16,93.34,93.55,93.77,93.96,94.18,94.33,94.48,94.67],"label":"step 190000","step":190000},{"mean":[28.4,58.9,72.16,83.75],"std":[1.31,1.45,2.01,0.99],"median_rank":3.9,"cmc":[28.4,40.91,48.89,54.5,58.9,62.24,65.14,67.62,70.11,72.16,73.89,75.39,76.77,78.06,79.13,80.39,81.33,82.21,82.95,83.75,84.48,85.19,85.82,86.46,87.07,87.67,88.04,88.48,89.01,89.38,89.87,90.17,90.59,90.87,91.06,91.32,91.72,92.03,92.26,92.52,92.73,93.05,93.26,93.44,93.65,93.85,93.98,94.17,94.35,94.53],"label":"final","step":200000}]};
+const runs = DATA.runs;
+const untrained = runs[0];
+const final = runs[runs.length - 1];
+const RANK_NAMES = DATA.ranks.map(n => "Rank-" + n);
+const SERIES_VARS = ["--s1", "--s2", "--s3", "--s4"];
+const NS = "http://www.w3.org/2000/svg";
+
+const pct = v => v.toFixed(1) + "%";
+const num = n => n.toLocaleString("en-US");
+const trim = v => String(+v.toFixed(1));
+const fmtStep = r => r.step === 0 ? "Untrained" : num(r.step) + (r.label === "final" ? " (final)" : "");
+
+// ---------- static text from the data ----------
+const g = DATA.seeds;
+document.getElementById("subtitle").textContent =
+  "The final model (200,000 training steps) identifying 1,000 people it never saw in training, each enrolled from 3 typing sessions. Averaged over " + g + " random draws.";
+document.getElementById("hero-value").textContent = pct(final.mean[0]);
+document.getElementById("hero-delta").textContent =
+  "+" + (final.mean[0] - untrained.mean[0]).toFixed(1) + " points vs. untrained (" + pct(untrained.mean[0]) + ")";
+document.getElementById("hero-note").textContent =
+  "± " + final.std[0].toFixed(1) + " across draws. Chance is 0.1%.";
+
+const tiles = document.getElementById("tiles");
+[[1, "Rank-5", "the right person is in the top 5"], [2, "Rank-10", "in the top 10"], [3, "Rank-20", "in the top 20"]].forEach(([i, label, note]) => {
+  const d = document.createElement("div"); d.className = "card tile";
+  d.innerHTML = '<div class="tile-label"></div><div class="tile-value"></div><div class="delta"></div><div class="tile-note"></div>';
+  d.children[0].textContent = label;
+  d.children[1].textContent = pct(final.mean[i]);
+  d.children[2].textContent = "+" + (final.mean[i] - untrained.mean[i]).toFixed(1) + " points vs. untrained";
+  d.children[3].textContent = note;
+  tiles.appendChild(d);
+});
+{
+  const d = document.createElement("div"); d.className = "card tile";
+  d.innerHTML = '<div class="tile-label"></div><div class="tile-value"></div><div class="delta"></div><div class="tile-note"></div>';
+  d.children[0].textContent = "Median true rank";
+  d.children[1].textContent = trim(final.median_rank);
+  d.children[2].textContent = "vs. " + trim(untrained.median_rank) + " untrained";
+  d.children[3].textContent = "of 1,000 enrolled (1 is best)";
+  tiles.appendChild(d);
+}
+
+const n1 = Math.round(final.mean[0] * 10), n20 = Math.round(final.mean[3] * 10);
+document.getElementById("explain-rank").textContent =
+  "Rank-1 of " + pct(final.mean[0]) + " means about " + n1 + " of 1,000 queries had the correct person as the top pick. Rank-20 of " +
+  pct(final.mean[3]) + " means about " + n20 + " of 1,000 had them somewhere in the top 20.";
+document.getElementById("explain-pm").textContent =
+  "Rank-1 of " + final.mean[0].toFixed(1) + " ± " + final.std[0].toFixed(1) + " means a single draw typically lands between about " +
+  Math.round(final.mean[0] - final.std[0]) + "% and " + Math.round(final.mean[0] + final.std[0]) + "%.";
+
+const plateau = runs.filter(r => r.step >= 120000);
+const pmin = Math.min(...plateau.map(r => r.mean[0])), pmax = Math.max(...plateau.map(r => r.mean[0]));
+const at90 = runs.find(r => r.step === 90000);
+document.getElementById("explain-curve").textContent =
+  "Accuracy rises quickly until about 90,000 steps (Rank-1 " + pct(at90.mean[0]) + "), then flattens: from 120,000 to 200,000 steps every checkpoint sits between " +
+  pmin.toFixed(1) + "% and " + pmax.toFixed(1) + "% Rank-1, inside the draw-to-draw noise. It does not drop, so there is no sign of overfitting, and more steps of this recipe are unlikely to help. " +
+  "The final checkpoint (200,000 steps) is the base model: it is tied for best, and its file stores the optimizer state so training can resume.";
+document.getElementById("setup").textContent =
+  "KeystrokeEncoder: 2 stacked LSTMs (128) → masked mean-pool → Dense(128) → L2-normalize; 217,216 parameters. Triplet loss on cosine distance (margin 0.5), Adam lr 1e-3, batches of 64 triplets, 200,000 steps, trained on 151,734 subjects. " +
+  "Evaluation uses only the 16,859 held-out subjects (data/split.json). Numbers here come from " + g + " seeds (0-" + (g - 1) + ").";
+
+// ---------- tables ----------
+function buildTable(root, headers, rows, finalRowIdx) {
+  const t = document.createElement("table");
+  const thead = t.createTHead().insertRow();
+  headers.forEach(h => { const th = document.createElement("th"); th.textContent = h; thead.appendChild(th); });
+  const tb = t.createTBody();
+  rows.forEach((cells, ri) => {
+    const tr = tb.insertRow(); if (ri === finalRowIdx) tr.className = "final";
+    cells.forEach(c => { tr.insertCell().textContent = c; });
+  });
+  root.appendChild(t);
+}
+buildTable(document.getElementById("c1-table-body"),
+  ["Checkpoint (steps)", ...RANK_NAMES, "Median true rank"],
+  runs.map(r => [fmtStep(r), ...r.mean.map((m, i) => m.toFixed(1) + " ± " + r.std[i].toFixed(1)), trim(r.median_rank)]),
+  runs.length - 1);
+{
+  const picks = [1, 2, 3, 5, 10, 15, 20, 30, 40, 50];
+  buildTable(document.getElementById("c2-table-body"),
+    ["Top N candidates", "Final model", "Untrained"],
+    picks.map(n => [String(n), pct(final.cmc[n - 1]), pct(untrained.cmc[n - 1])]), -1);
+}
+
+// ---------- line chart ----------
+function lineChart(root, tip, cfg) {
+  root.textContent = "";
+  if (root.clientWidth === 0) return;
+  const W = Math.max(root.clientWidth, 280), H = 340;
+  const wide = W >= 560;
+  const m = { l: 46, r: wide ? cfg.rightMargin : 22, t: 14, b: 54 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const xs = cfg.xs, x0 = xs[0], x1 = xs[xs.length - 1], last = xs.length - 1;
+  const X = v => m.l + (v - x0) / (x1 - x0) * pw;
+  const Y = v => m.t + (1 - v / 100) * ph;
+
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.setAttribute("aria-hidden", "true");
+  const el = (name, attrs, parent) => {
+    const n = document.createElementNS(NS, name);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    (parent || svg).appendChild(n); return n;
+  };
+  const text = (str, attrs) => { const t = el("text", attrs); t.textContent = str; return t; };
+
+  [0, 20, 40, 60, 80, 100].forEach(v => {
+    el("line", { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), class: v === 0 ? "axisline" : "gridline" });
+    text(v + "%", { x: m.l - 8, y: Y(v) + 4, "text-anchor": "end", class: "tick" });
+  });
+  cfg.xTicks.forEach(t => text(t.label, { x: X(t.v), y: H - m.b + 20, "text-anchor": "middle", class: "tick" }));
+  text(cfg.xTitle, { x: m.l + pw / 2, y: H - 10, "text-anchor": "middle", class: "tick" });
+
+  cfg.series.forEach(s => {
+    const d = xs.map((x, i) => (i ? "L" : "M") + X(x).toFixed(1) + "," + Y(s.values[i]).toFixed(1)).join("");
+    el("path", { d, fill: "none", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round", style: "stroke:var(" + s.color + ")" });
+    el("circle", { cx: X(x1), cy: Y(s.values[last]), r: 4.5, class: "ring", style: "fill:var(" + s.color + ")" });
+    if (wide) {
+      const y = Y(s.values[last]);
+      el("line", { x1: X(x1) + 12, x2: X(x1) + 26, y1: y, y2: y, "stroke-width": 2, "stroke-linecap": "round", style: "stroke:var(" + s.color + ")" });
+      const t = el("text", { x: X(x1) + 32, y: y + 4 });
+      const a = document.createElementNS(NS, "tspan"); a.setAttribute("class", "endname"); a.textContent = s.short + " ";
+      const b = document.createElementNS(NS, "tspan"); b.setAttribute("class", "endval"); b.textContent = pct(s.values[last]);
+      t.appendChild(a); t.appendChild(b);
+    }
+  });
+
+  const xhair = el("line", { y1: m.t, y2: m.t + ph, class: "xhair", visibility: "hidden" });
+  const dots = cfg.series.map(s => el("circle", { r: 4.5, class: "ring", visibility: "hidden", style: "fill:var(" + s.color + ")" }));
+  const hit = el("rect", { x: m.l - 8, y: m.t, width: pw + 16, height: ph, fill: "transparent" });
+  root.appendChild(svg);
+
+  let idx = last;
+  function show(i) {
+    idx = i;
+    const px = X(xs[i]);
+    xhair.setAttribute("x1", px); xhair.setAttribute("x2", px); xhair.setAttribute("visibility", "visible");
+    dots.forEach((d, k) => { d.setAttribute("cx", px); d.setAttribute("cy", Y(cfg.series[k].values[i])); d.setAttribute("visibility", "visible"); });
+    tip.textContent = "";
+    const h = document.createElement("div"); h.className = "tip-h"; h.textContent = cfg.tipHeader(i); tip.appendChild(h);
+    cfg.series.forEach(s => {
+      const row = document.createElement("div"); row.className = "tip-r";
+      const key = document.createElement("span"); key.className = "key"; key.style.background = "var(" + s.color + ")";
+      const v = document.createElement("strong");
+      v.textContent = pct(s.values[i]) + (s.std ? " ± " + s.std[i].toFixed(1) : "");
+      const n = document.createElement("span"); n.className = "n"; n.textContent = s.name;
+      row.append(key, v, n); tip.appendChild(row);
+    });
+    tip.style.display = "block";
+    const tw = tip.offsetWidth;
+    let left = px + 16; if (left + tw > W) left = px - tw - 16;
+    tip.style.left = Math.max(0, left) + "px"; tip.style.top = (m.t + 8) + "px";
+  }
+  function hide() {
+    xhair.setAttribute("visibility", "hidden"); dots.forEach(d => d.setAttribute("visibility", "hidden")); tip.style.display = "none";
+  }
+  function nearest(clientX) {
+    const r = svg.getBoundingClientRect();
+    const v = x0 + (clientX - r.left - m.l) / pw * (x1 - x0);
+    let best = 0;
+    xs.forEach((x, i) => { if (Math.abs(x - v) < Math.abs(xs[best] - v)) best = i; });
+    return best;
+  }
+  hit.addEventListener("pointermove", e => show(nearest(e.clientX)));
+  hit.addEventListener("pointerleave", hide);
+  root.onkeydown = e => {
+    if (e.key === "ArrowLeft") { show(Math.max(0, idx - 1)); e.preventDefault(); }
+    else if (e.key === "ArrowRight") { show(Math.min(last, idx + 1)); e.preventDefault(); }
+    else if (e.key === "Escape") hide();
+  };
+  root.onfocus = () => show(idx);
+  root.onblur = hide;
+}
+
+function legend(root, series) {
+  series.forEach(s => {
+    const sp = document.createElement("span");
+    const k = document.createElement("i"); k.className = "key"; k.style.background = "var(" + s.color + ")";
+    const t = document.createElement("span"); t.textContent = s.name;
+    sp.append(k, t); root.appendChild(sp);
+  });
+}
+
+const c1 = {
+  xs: runs.map(r => r.step),
+  series: RANK_NAMES.map((n, i) => ({
+    name: n, short: n, color: SERIES_VARS[i],
+    values: runs.map(r => r.mean[i]), std: runs.map(r => r.std[i]),
+  })),
+  xTicks: [0, 50000, 100000, 150000, 200000].map(v => ({ v, label: v === 0 ? "0" : v / 1000 + "k" })),
+  xTitle: "Training steps (0 = untrained model)",
+  rightMargin: 118,
+  tipHeader: i => runs[i].step === 0 ? "Untrained model" : "Step " + num(runs[i].step) + (runs[i].label === "final" ? " (final model)" : ""),
+};
+const c2 = {
+  xs: DATA.cmc_n,
+  series: [
+    { name: "Final model (200k steps)", short: "Final", color: "--s1", values: final.cmc },
+    { name: "Untrained", short: "Untrained", color: "--s2", values: untrained.cmc },
+  ],
+  xTicks: [1, 10, 20, 30, 40, 50].map(v => ({ v, label: String(v) })),
+  xTitle: "Number of top candidates considered (N)",
+  rightMargin: 132,
+  tipHeader: i => "Correct person in the top " + DATA.cmc_n[i] + " candidates",
+};
+
+const charts = [
+  { cfg: c1, root: document.getElementById("c1-root"), tip: document.getElementById("c1-tip"), legend: document.getElementById("c1-legend") },
+  { cfg: c2, root: document.getElementById("c2-root"), tip: document.getElementById("c2-tip"), legend: document.getElementById("c2-legend") },
+];
+charts.forEach(c => legend(c.legend, c.cfg.series));
+const renderAll = () => charts.forEach(c => lineChart(c.root, c.tip, c.cfg));
+
+// ---------- chart / table toggle ----------
+document.querySelectorAll(".seg").forEach(seg => {
+  seg.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    const id = seg.dataset.target, view = b.dataset.view;
+    seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    document.getElementById(id + "-chart").hidden = view !== "chart";
+    document.getElementById(id + "-table").hidden = view !== "table";
+    if (view === "chart") renderAll();
+  });
+});
+
+// ---------- timeline scrubber (Google Photos style) ----------
+const scrub = document.getElementById("scrub");
+const thumb = document.getElementById("scrub-thumb");
+const bubble = document.getElementById("scrub-bubble");
+const hitArea = document.getElementById("scrub-hit");
+const secs = [...document.querySelectorAll(".milestone")];
+const N = secs.length;
+const ticks = secs.map((s, i) => {
+  const a = document.createElement("a");
+  a.className = "scrub-tick"; a.href = "#" + s.id; a.setAttribute("aria-label", s.dataset.date + ": " + s.dataset.title);
+  const l = document.createElement("span"); l.className = "lbl"; l.textContent = s.dataset.date;
+  const d = document.createElement("i"); d.className = "dot";
+  a.append(l, d); scrub.appendChild(a); return a;
+});
+
+let TH = 0, anchors = [];
+function layoutScrub() {
+  TH = scrub.clientHeight;
+  const maxS = Math.max(0, document.documentElement.scrollHeight - innerHeight);
+  anchors = secs.map(s => Math.max(0, Math.min(maxS, s.getBoundingClientRect().top + scrollY - 16)));
+  anchors[0] = 0;
+  for (let i = N - 2; i >= 0; i--) anchors[i] = Math.min(anchors[i], anchors[i + 1] - 1);
+  ticks.forEach((t, i) => { t.style.top = (i / (N - 1) * TH) + "px"; });
+  updateScrub();
+}
+function updateScrub() {
+  const s = scrollY;
+  let i = 0; while (i < N - 1 && anchors[i + 1] <= s) i++;
+  const f = i >= N - 1 ? N - 1 : i + (s - anchors[i]) / (anchors[i + 1] - anchors[i]);
+  thumb.style.top = (f / (N - 1) * TH) + "px";
+  const act = Math.round(f);
+  ticks.forEach((t, k) => t.classList.toggle("active", k === act));
+  bubble.textContent = secs[act].dataset.date + " · " + secs[act].dataset.title;
+}
+let peekTimer, dragging = false;
+function peek() {
+  scrub.classList.add("show"); clearTimeout(peekTimer);
+  peekTimer = setTimeout(() => { if (!dragging) scrub.classList.remove("show"); }, 1200);
+}
+let raf = 0;
+addEventListener("scroll", () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; updateScrub(); peek(); }); }, { passive: true });
+
+function seek(clientY) {
+  const r = scrub.getBoundingClientRect();
+  const f = Math.max(0, Math.min(1, (clientY - r.top) / TH)) * (N - 1);
+  const i = Math.min(N - 2, Math.floor(f));
+  scrollTo({ top: anchors[i] + (f - i) * (anchors[i + 1] - anchors[i]), behavior: "instant" });
+}
+hitArea.addEventListener("pointerdown", e => {
+  dragging = true; hitArea.setPointerCapture(e.pointerId); scrub.classList.add("dragging", "show"); seek(e.clientY); e.preventDefault();
+});
+hitArea.addEventListener("pointermove", e => { if (dragging) seek(e.clientY); });
+const endDrag = () => { dragging = false; scrub.classList.remove("dragging"); peek(); };
+hitArea.addEventListener("pointerup", endDrag);
+hitArea.addEventListener("pointercancel", endDrag);
+
+renderAll(); layoutScrub();
+let rz; new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { renderAll(); layoutScrub(); }, 80); }).observe(document.querySelector(".wrap"));
+addEventListener("load", layoutScrub);
+addEventListener("resize", layoutScrub);
+</script>
+</body>
+</html>

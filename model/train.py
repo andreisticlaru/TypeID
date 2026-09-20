@@ -103,7 +103,13 @@ def train_step(model: KeystrokeEncoder, optimizer: torch.optim.Optimizer, batch:
     
 
 
-def save_checkpoint(model: KeystrokeEncoder, config: dict, path=CHECKPOINT_PATH) -> None:
+def save_checkpoint(
+    model: KeystrokeEncoder,
+    config: dict,
+    path=CHECKPOINT_PATH,
+    optimizer: torch.optim.Optimizer | None = None,
+    step: int | None = None,
+) -> None:
     """Save the encoder weights (state_dict, not the pickled module) plus `config`.
 
     Bundled in one file so the weights can never be separated from the settings
@@ -111,8 +117,31 @@ def save_checkpoint(model: KeystrokeEncoder, config: dict, path=CHECKPOINT_PATH)
         ckpt = torch.load(path, map_location="cpu")
         model = KeystrokeEncoder(**ckpt["config"]["model"])
         model.load_state_dict(ckpt["state_dict"])
+
+    `optimizer` and `step` are only needed to resume training: Adam's running
+    averages live in the optimizer, and without them a resumed run restarts
+    with empty momentum history.
     """
-    torch.save({"state_dict": model.state_dict(), "config": config}, path)
+    ckpt = {"state_dict": model.state_dict(), "config": config}
+    if optimizer is not None:
+        ckpt["optimizer"] = optimizer.state_dict()
+    if step is not None:
+        ckpt["step"] = step
+    torch.save(ckpt, path)
+
+
+def load_for_resume(path, model: KeystrokeEncoder, optimizer: torch.optim.Optimizer, device: torch.device) -> int:
+    """Load weights (and Adam state, if saved) into `model`/`optimizer`; return the step reached.
+
+    Checkpoints from before resume support have no optimizer state or "step"
+    key: they resume with fresh Adam history, and the step falls back to the
+    config's total steps.
+    """
+    ckpt = torch.load(path, map_location=device)
+    model.load_state_dict(ckpt["state_dict"])
+    if "optimizer" in ckpt:
+        optimizer.load_state_dict(ckpt["optimizer"])
+    return ckpt.get("step", ckpt["config"]["steps"])
 
 
 def main():
@@ -122,6 +151,8 @@ def main():
     parser.add_argument("--lr", type=float, default=LR)
     parser.add_argument("--save-every", type=int, default=0,
                         help="also save encoder_step<N>.pt every N steps (0 = only save at the end)")
+    parser.add_argument("--resume", default=None,
+                        help="checkpoint to continue from; --steps is then the TOTAL target, not extra steps")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -146,6 +177,16 @@ def main():
     model = KeystrokeEncoder().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
+    start_step = 0
+    if args.resume:
+        start_step = load_for_resume(args.resume, model, optimizer, device)
+        for group in optimizer.param_groups:
+            group["lr"] = args.lr  # the loaded optimizer state carries the old lr; --lr wins
+        if start_step >= args.steps:
+            print(f"Checkpoint is already at step {start_step} >= --steps {args.steps}; nothing to do.")
+            return
+        print(f"Resuming from {args.resume} at step {start_step}")
+
     config = {
         "model": {
             "input_size": INPUT_SIZE,
@@ -162,7 +203,7 @@ def main():
     }
 
     running_loss = 0.0
-    for step in range(1, args.steps + 1):
+    for step in range(start_step + 1, args.steps + 1):
         model.train()  # Enable dropout
         batch = to_tensors(sampler.sample_batch(args.batch_size), device)
         loss = train_step(model, optimizer, batch)
@@ -174,9 +215,12 @@ def main():
             running_loss = 0.0
 
         if args.save_every and step % args.save_every == 0 and step != args.steps:
-            save_checkpoint(model, {**config, "steps": step}, CHECKPOINT_PATH.with_name(f"encoder_step{step}.pt"))
+            save_checkpoint(
+                model, {**config, "steps": step}, CHECKPOINT_PATH.with_name(f"encoder_step{step}.pt"),
+                optimizer=optimizer, step=step,
+            )
 
-    save_checkpoint(model, config)
+    save_checkpoint(model, config, optimizer=optimizer, step=args.steps)
  
     
 
