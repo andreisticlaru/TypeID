@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
+import numpy as np
 import torch
 
 from data.config import DATA_ROOT, PREPROCESSED_PATH
@@ -58,14 +60,48 @@ def to_tensors(batch: dict, device: torch.device) -> dict:
     """Convert the sampler's numpy batch into torch tensors on `device`.
 
     Windows -> float32, masks -> bool (KeystrokeEncoder.forward expects both).
+    Subject-id arrays are strings, so they stay as numpy; mining compares them
+    on the CPU.
     """
-    # TODO: for each key in `batch`, torch.from_numpy(...).to(device).
-    for key in batch:
-        batch[key] = torch.from_numpy(batch[key]).to(device)
+    for key, value in batch.items():
+        if value.dtype.kind in "fb":
+            batch[key] = torch.from_numpy(value).to(device)
 
     return batch
 
-def train_step(model: KeystrokeEncoder, optimizer: torch.optim.Optimizer, batch: dict) -> float:
+
+def mine_semi_hard(anchor, positive, negative, same_subject, margin: float = MARGIN):
+    """Swap each anchor's sampled negative for a harder one already in the batch.
+
+    Candidates are every positive and negative embedding in the batch (2B of
+    them), minus any belonging to the anchor's own subject -- without that mask
+    a same-subject collision would be the *closest* candidate and get picked
+    preferentially, training the model to push one person's samples apart.
+
+    Preference is semi-hard: the closest candidate still farther than the
+    positive. That yields a non-zero loss without the collapse risk of always
+    taking the outright hardest negative. If nothing qualifies (every candidate
+    is already closer than the positive), fall back to the farthest valid one,
+    the gentlest of the violating options.
+
+    Returns (d_ap, d_an) so the caller can form the loss.
+    """
+    pool = torch.cat([positive, negative])                # (2B, D)
+    d_ap = 1 - (anchor * positive).sum(1, keepdim=True)   # (B, 1)
+    d_an = 1 - anchor @ pool.T                            # (B, 2B)
+
+    valid = d_an.detach().masked_fill(same_subject, float("inf"))
+    semi = valid.masked_fill(valid <= d_ap.detach(), float("inf"))
+    idx = semi.argmin(1)
+
+    none_qualify = semi.gather(1, idx[:, None]).isinf().squeeze(1)
+    if none_qualify.any():
+        farthest = valid.masked_fill(valid.isinf(), -float("inf")).argmax(1)
+        idx = torch.where(none_qualify, farthest, idx)
+
+    return d_ap.squeeze(1), d_an.gather(1, idx[:, None]).squeeze(1)
+
+def train_step(model: KeystrokeEncoder, optimizer: torch.optim.Optimizer, batch: dict, mine: bool = False) -> float:
     """One optimization step on a batch of tensors. Returns the loss as a float.
 
     Note: anchor, positive and negative all go through the SAME model instance --
@@ -89,7 +125,15 @@ def train_step(model: KeystrokeEncoder, optimizer: torch.optim.Optimizer, batch:
     negative = model(batch["negative_windows"], batch["negative_masks"])
 
     # Step 2: Compute the triplet loss
-    loss = triplet_loss(anchor, positive, negative)
+    if mine:
+        pool_subjects = np.concatenate([batch["anchor_subjects"], batch["negative_subjects"]])
+        same_subject = torch.from_numpy(
+            batch["anchor_subjects"][:, None] == pool_subjects[None, :]
+        ).to(anchor.device)
+        d_ap, d_an = mine_semi_hard(anchor, positive, negative, same_subject)
+        loss = torch.clamp(d_ap - d_an + MARGIN, min=0).mean()
+    else:
+        loss = triplet_loss(anchor, positive, negative)
 
     # Step 3: Backward Pass and Optimization
     optimizer.zero_grad()
@@ -153,7 +197,12 @@ def main():
                         help="also save encoder_step<N>.pt every N steps (0 = only save at the end)")
     parser.add_argument("--resume", default=None,
                         help="checkpoint to continue from; --steps is then the TOTAL target, not extra steps")
+    parser.add_argument("--mine", action="store_true",
+                        help="semi-hard in-batch negative mining instead of the randomly sampled negative")
+    parser.add_argument("--out", default=str(CHECKPOINT_PATH),
+                        help="where to write the final checkpoint; --save-every files get a _step<N> suffix")
     args = parser.parse_args()
+    out_path = Path(args.out)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -200,13 +249,15 @@ def main():
         "steps": args.steps,
         "split_seed": split_seed,
         "num_train_subjects": len(sampler.allowed_subjects),
+        "mine": args.mine,
+        "resumed_from": args.resume,
     }
 
     running_loss = 0.0
     for step in range(start_step + 1, args.steps + 1):
         model.train()  # Enable dropout
         batch = to_tensors(sampler.sample_batch(args.batch_size), device)
-        loss = train_step(model, optimizer, batch)
+        loss = train_step(model, optimizer, batch, mine=args.mine)
 
         running_loss += loss
         if step % LOG_EVERY == 0:
@@ -216,11 +267,12 @@ def main():
 
         if args.save_every and step % args.save_every == 0 and step != args.steps:
             save_checkpoint(
-                model, {**config, "steps": step}, CHECKPOINT_PATH.with_name(f"encoder_step{step}.pt"),
+                model, {**config, "steps": step},
+                out_path.with_name(f"{out_path.stem}_step{step}{out_path.suffix}"),
                 optimizer=optimizer, step=step,
             )
 
-    save_checkpoint(model, config, optimizer=optimizer, step=args.steps)
+    save_checkpoint(model, config, out_path, optimizer=optimizer, step=args.steps)
  
     
 

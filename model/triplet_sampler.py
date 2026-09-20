@@ -202,7 +202,11 @@ class TripletSampler:
             'positive_window': self.windows[positive_row],
             'positive_mask': self.mask[positive_row],
             'negative_window': self.windows[negative_row],
-            'negative_mask': self.mask[negative_row]
+            'negative_mask': self.mask[negative_row],
+            # Subject ids ride along so in-batch negative mining can rule out
+            # candidates that secretly belong to the anchor's own subject.
+            'anchor_subject': anchor,
+            'negative_subject': negative_subject,
         }
 
         
@@ -237,4 +241,6 @@ class TripletSampler:
             'positive_masks': np.stack([t['positive_mask'] for t in triplets]),
             'negative_windows': np.stack([t['negative_window'] for t in triplets]),
             'negative_masks': np.stack([t['negative_mask'] for t in triplets]),
+            'anchor_subjects': np.array([t['anchor_subject'] for t in triplets]),
+            'negative_subjects': np.array([t['negative_subject'] for t in triplets]),
         }
