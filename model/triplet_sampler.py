@@ -15,7 +15,13 @@ import numpy as np
 
 
 class TripletSampler:
-    """Load cached Aalto arrays and sample triplets for training."""
+    """Load cached Aalto arrays and sample triplets for training.
+
+    Data layout: the four arrays are parallel, one entry per WINDOW (row), not
+    per session. A session can own several rows (a long sentence is split into
+    multiple 50-keystroke windows that share a session_id), and a subject owns
+    many sessions. IDs are strings (read from TSV, never cast to int).
+    """
 
     def __init__(
         self,
@@ -54,9 +60,11 @@ class TripletSampler:
 
         # Only subjects with 2+ distinct sessions can serve as anchors (need a
         # different session for the positive).
-        self.eligible_anchor_subjects = [
-            subj for subj, sessions in self.subject_to_sessions.items() if len(sessions) >= 2
-        ]
+        # An ndarray, not a list: np.random.choice re-converts a list to an
+        # array on every call, which was the dominant cost in sample_triplet.
+        self.eligible_anchor_subjects = np.array(
+            [subj for subj, sessions in self.subject_to_sessions.items() if len(sessions) >= 2]
+        )
 
         # Precomputed once so sample_triplet doesn't rebuild/rescan this list
         # on every call.

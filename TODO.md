@@ -22,31 +22,33 @@ Essential foundation—everything downstream depends on this.
   - ✅ Backspace kept as a real keystroke (no special-casing needed—dataset already logs it as `BKSP`)
   - ✅ `MIN_KEYSTROKES = 25` floor enforced, raises `ValueError` below it
   - ✅ Verified end-to-end on real Aalto files, including a CSV-quoting bug fix (`csv.QUOTE_NONE`—Aalto sentences contain literal `"` chars that broke default quoting and silently merged rows)
-  - ✅ `features/test_extract.py`: 11 unit tests covering windowing/masking/padding boundaries, the min-length guard, event pairing (sequential, overlapping, orphaned keyup), and negative-IL preservation. All passing.
+  - ✅ Per-window floor: a trailing window with fewer than `MIN_KEYSTROKES` real vectors is dropped (the session-level check alone let 1-24-vector tail windows into the cache)
+  - ✅ `features/test_extract.py`: 12 unit tests covering windowing/masking/padding boundaries, the min-length guard, the dropped-trailing-window rule (and its boundary at exactly `MIN_KEYSTROKES`), event pairing (sequential, overlapping, orphaned keyup), and negative-IL preservation. All passing.
 
 - [x] **Cache preprocessed Aalto sequences**
   - ✅ `data/build_cache.py` runs `windows_from_keystrokes()` over all Aalto sessions, saves to `/data/preprocessed/` as four flat `.npy` arrays (no per-subject files — grouping by subject happens later via an in-memory index over `subject_ids.npy`)
   - ✅ Full run (168,593 participants): `sessions_ok=2,280,166`, `sessions_skipped=248,729` (below `MIN_KEYSTROKES` floor), elapsed=2161s (~36 min)
   - ✅ Verified saved arrays:
     ```
-    windows.npy      (3343148, 50, 4) float32
-    mask.npy         (3343148, 50) bool
-    subject_ids.npy  (3343148,) <U6
-    session_ids.npy  (3343148,) <U7
+    windows.npy      (2483167, 50, 4) float32   (rebuilt after the per-window floor; was 3,343,148)
+    mask.npy         (2483167, 50) bool
+    subject_ids.npy  (2483167,) <U6
+    session_ids.npy  (2483167,) <U7
 
     unique subjects: 168593 (matches participants_processed)
     any NaN in windows: False
-    mask true-count per row: min=1, max=50 (never 0, never >50)
+    mask true-count per row: min=25, max=50 (never below MIN_KEYSTROKES, never >50)
     padded region is all-zero: confirmed on sample rows
     first row: subject=100001, session=1090979 (1 window for this subject/session)
     ```
   - ✅ Example row at the minimum-length floor — row 61 (subject=100008, session=1091062, real length=25): `mask[61]` is `True` for indices 0-24, `False` for 25-49; `windows[61][20:29]` shows real HL/IL/PL/RL values through index 24, then exact `(0,0,0,0)` padding onward — confirms padding/masking works correctly at the boundary
-  - Note: `sessions_ok` (2.28M) < total windows (3.34M) because sessions longer than M=50 split into multiple windows — expected, not a bug
+  - Note: `sessions_ok` (2.28M) < total windows (2.48M) because sessions longer than M=50 split into multiple windows — expected, not a bug
+  - Note: `data/preprocessed/` is a snapshot of the extractor. Any change to `features/extract.py` (including `MIN_KEYSTROKES`) needs `python -m data.build_cache --limit 168593` (~36 min) to take effect on training data.
   - Goal: Fast data loading during model training (avoid recomputing on every epoch) ✓
 
 ## Phase 2: Model Training
 
-- [ ] **Define LSTM embedding network**
+- [x] **Define LSTM embedding network**
   - 2-layer LSTM(128) with dropout
   - Masked mean-pool or final hidden state over variable-length sequences
   - Dense layer to 128-dim embedding
@@ -54,19 +56,23 @@ Essential foundation—everything downstream depends on this.
   - File: `/model/network.py`
   - Verify: Input is (batch, M=50, 4), output is (batch, 128)
 
-- [ ] **Implement triplet loss**
+- [x] **Implement triplet loss**
   - Formula: `L = max(0, d(f(A), f(P)) - d(f(A), f(N)) + margin)`
   - Use cosine distance
   - Margin: start ~0.5, tune if needed
   - File: `/model/losses.py`
 
-- [ ] **Triplet construction from Aalto**
-  - Sample subject X, draw two sessions (A, P) with different sentences
-  - Sample subject Y, draw one session (N)
-  - Resample fresh triplets per batch (not precomputed)
+- [x] **Triplet construction from Aalto** (`model/triplet_sampler.py`)
+  - ✅ Sample subject X (2+ sessions), draw two different sessions (A, P); sample different subject Y, draw one session (N)
+  - ✅ Fresh triplets per batch (not precomputed); `sample_batch` stacks them; ~0.1 ms/triplet
+  - ✅ Optional `subjects` allowlist for the train/eval split
   - Future: add hard negative mining after warmup
 
+- [x] **Subject-disjoint train/eval split** (`data/make_split.py` → `data/split.json`)
+  - ✅ 90/10 by subject, seed 42, saved so train and eval share the same held-out set (151,734 / 16,859)
+
 - [ ] **Training script (`model/train.py`)**
+  - Scaffolded (`build_sampler`, `to_tensors`, `train_step`, `save_checkpoint`, `main`); run from `.venv-model` (system Python has no torch)
   - Load preprocessed Aalto sequences
   - Batch triplets, forward pass, backprop
   - Adam optimizer, lr ≈ 1e-3

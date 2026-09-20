@@ -80,9 +80,30 @@ The negative IL is real, not a bug: it means W was pressed while SHIFT was still
 
 **Why N keystrokes yield N−1 vectors.** HL(n) only needs keystroke `n`, but IL/PL/RL(n) all need keystroke `n+1` too. The last keystroke in a session has no "next" to pair against, so it doesn't get a complete vector. A session of N keystrokes produces N−1 feature vectors—a deliberate boundary decision (`features/extract.py:92-96`), not an accident. The alternative would mean inventing a value for something that isn't actually measurable.
 
-**Windowing and the mask, concretely.** A short session (say 25 vectors) becomes one window with the remaining 25 slots zero-padded. A long session (say 51 vectors) becomes two windows: the first holds 50 real vectors, the second holds 1 real vector plus 49 padding. Alongside every window, a same-shaped boolean mask records which slots are real (`True`) vs. padding (`False`). The padding is literal zeros—"0ms hold, 0ms gap"—which is impossible for genuine typing. Without the mask, the LSTM has no way to distinguish real zero-latency data (never happens) from "no more data here, ignore this." The mask is what lets training and inference process only the real timesteps.
+**Windowing and the mask, concretely.** A short session (say 25 vectors) becomes one window with the remaining 25 slots zero-padded. A long session (say 80 vectors) becomes two windows: the first holds 50 real vectors, the second holds 30 real vectors plus 20 padding (a trailing remainder under the floor is dropped, see below). Alongside every window, a same-shaped boolean mask records which slots are real (`True`) vs. padding (`False`). The padding is literal zeros—"0ms hold, 0ms gap"—which is impossible for genuine typing. Without the mask, the LSTM has no way to distinguish real zero-latency data (never happens) from "no more data here, ignore this." The mask is what lets training and inference process only the real timesteps.
 
 **The floor.** Before any of this runs, `windows_from_keystrokes()` checks `len(pairs) >= MIN_KEYSTROKES + 1` (26 pairs → 25 vectors). Below that, it raises `ValueError` instead of producing a window—too little rhythm to trust, rejected outright rather than fed to the model as noise.
+
+**The floor applies per window, not just per session.** That session-level check only guarantees the *total*. Chunking into M=50 windows leaves a remainder in the last window, and without a second check that remainder could hold 1-24 real vectors (the first cache had windows with 3/50 and 9/50 real keystrokes, which then got sampled as anchors/positives/negatives). So after chunking, `windows_from_keystrokes()` drops the trailing window if it holds fewer than `MIN_KEYSTROKES` real vectors. It can never drop the *only* window, since the session check already guarantees at least `MIN_KEYSTROKES` vectors. Because this lives in the canonical extractor, training and live enroll/identify behave identically. `MIN_KEYSTROKES` can be changed later: live requests pick it up immediately, but the training cache is a snapshot and needs one `data.build_cache` rerun to match.
+
+### Cache layout: row = window, not session
+
+The cache is four parallel arrays, indexed in lockstep by the same row number `i`:
+
+```
+index:        0         1         2         3         4         5
+subject_ids:  100001    100001    100001    100001    100001    100001    (<U6 strings)
+session_ids:  1090979   1091016   1091025   1091025   1091042   1091042   (<U7 strings)
+windows:      (50,4)    (50,4)    (50,4)    (50,4)    (50,4)    (50,4)    float32
+mask:         (50,)     (50,)     (50,)     (50,)     (50,)     (50,)     bool
+```
+
+- **1 row = 1 window** (up to 50 keystroke vectors). This is the unit fed to the model.
+- **1 session = 1 or more rows.** A sentence long enough to overflow 50 vectors is split into several windows that share a `session_id` (rows 2-3 and 4-5 above).
+- **1 subject = many sessions.**
+- IDs are strings because they come straight from the TSV via `csv.DictReader`; they are never cast to int.
+
+`TripletSampler` scans these once to build three dict indexes so sampling never rescans 2.5M rows: `subject_to_rows`, `subject_session_to_rows` (`(subject, session)` maps to a list of rows), and `subject_to_sessions`.
 
 ## Model: Sequence Encoder with Triplet Loss
 
@@ -96,6 +117,10 @@ Input: sequence of M=50 timing vectors, each (HL, IL, PL, RL) [zero-padded + mas
 ```
 
 One set of weights. "Siamese" / "triplet network" refers to running this identical encoder on multiple training samples, not multiple networks.
+
+**What is hand-written vs. provided by PyTorch.** `nn.LSTM`, `nn.Linear`, `nn.Dropout`, autograd (`loss.backward()`) and the Adam optimizer are all PyTorch. What we write is the assembly in `KeystrokeEncoder` (two stacked LSTMs, masked mean-pool, Linear, L2 normalize) and the training loop. There is no scikit-learn-style `.fit()`, because training data is not a fixed table: each step samples fresh triplets, and the loss compares three embeddings at once. `model(x, mask)` works because `nn.Module` defines `__call__`, which does hook/train-eval bookkeeping and then calls our `forward(x, mask)`; always call `model(...)` rather than `model.forward(...)`.
+
+**Why an LSTM.** It is a sequence architecture (1997); transformers (2017, the basis of LLMs) solve the same problem with attention over all positions instead of step-by-step memory. Sequences here are short (at most 50 keystrokes) and TypeNet, the design this follows, used LSTMs, so a transformer would add complexity without a clear payoff. It is a natural later experiment; the training loop would be nearly identical.
 
 **Loss: Triplet loss with margin**
 
@@ -113,7 +138,14 @@ L = max(0, d(f(A), f(P)) - d(f(A), f(N)) + margin)
 3. Resample fresh triplets per batch/epoch, not precomputed.
 4. Optional refinement: semi-hard/hard negative mining after warmup epochs.
 
+Implementation notes (`model/triplet_sampler.py`):
+- Anchors are drawn only from subjects with 2+ sessions, since the positive needs a *different* session. The positive's session is chosen by filtering out the anchor's session from that subject's list (never mutate the shared index list in place).
+- The negative subject is rejection-sampled (redraw if it equals the anchor). With ~150k subjects a collision is ~1 in 150k, far cheaper than rebuilding a filtered subject list per call.
+- Sampling must stay O(1) per triplet. `np.random.choice` on a Python list converts the whole list to an array every call, so any list sampled from repeatedly must be a numpy array built once. (A 150k-item list made `sample_triplet` ~79 ms; as an array it is ~0.1 ms.)
+
 **Training:** Adam, lr ≈ 1e-3, batches of 32–128 triplets. Sequence encoding is slower than fixed-vector approaches—plan for GPU or scaled-down subject subset on CPU.
+
+Adam is the optimizer, the rule that turns gradients into weight updates. Plain gradient descent uses one learning rate for every weight, and per-batch gradients are noisy. Adam keeps two running averages per weight: a smoothed gradient (momentum) and the mean of squared gradients (scale), then steps by roughly `lr * momentum / sqrt(scale)`. Each weight effectively gets its own adaptive step size. That suits LSTMs and triplet loss, where many triplets already satisfy the margin and gradients are sparse and jumpy. Each step is: `loss = triplet_loss(f(A), f(P), f(N))`, `optimizer.zero_grad()`, `loss.backward()`, `optimizer.step()`.
 
 **Output:** Single frozen function `f(keystroke event sequence) -> 128-dim embedding`. Everything downstream (enrollment, identification) is forward pass + vector comparison.
 
@@ -155,6 +187,8 @@ Use identification task metrics, not classification metrics:
 Keep FAR/FRR/EER reserved for verification mode (if built).
 
 **Held-out protocol:** Split Aalto by subject, not session. Train on one subject set, build eval gallery from a disjoint set. This tests generalization to unseen identities, not just unseen sessions of trained people.
+
+**How the split is implemented.** `python -m data.make_split` shuffles the unique subject IDs with a fixed seed (default 42) and writes a 90/10 train/eval split to `data/split.json` (~151.7k / ~16.9k subjects). The lists are saved rather than re-derived from the seed so training and eval always share the identical held-out subjects, even if the cache is rebuilt. `TripletSampler(..., subjects=...)` takes an allowlist and skips other subjects while building its index; the arrays are not copied or filtered, so row indices still point into the full cache. Training builds the sampler with `train_subjects`; eval uses `eval_subjects`.
 
 ## Critical Invariant: Feature Extraction Parity
 
