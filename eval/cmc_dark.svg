@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" role="img" aria-label="Cumulative match curve: the trained model finds the correct person within the top 20 of 1000 enrolled candidates 84% of the time, versus 29% for an untrained model.">
+<rect width="760" height="400" fill="#0d0d0d"/>
+<text x="52" y="26" fill="#ffffff" font-size="15" font-weight="650">Identification accuracy on 1,000 people the model never saw</text>
+<text x="52" y="44" fill="#c3c2b7" font-size="12.5">Each enrolled from 3 typing sessions, queried with a different sentence. Mean of 10 draws.</text>
+<line x1="52" x2="608" y1="350.0" y2="350.0" stroke="#383835" stroke-width="1"/>
+<text x="44" y="354.0" fill="#898781" font-size="11.5" text-anchor="end">0%</text>
+<line x1="52" x2="608" y1="290.8" y2="290.8" stroke="#2c2c2a" stroke-width="1"/>
+<text x="44" y="294.8" fill="#898781" font-size="11.5" text-anchor="end">20%</text>
+<line x1="52" x2="608" y1="231.6" y2="231.6" stroke="#2c2c2a" stroke-width="1"/>
+<text x="44" y="235.6" fill="#898781" font-size="11.5" text-anchor="end">40%</text>
+<line x1="52" x2="608" y1="172.4" y2="172.4" stroke="#2c2c2a" stroke-width="1"/>
+<text x="44" y="176.4" fill="#898781" font-size="11.5" text-anchor="end">60%</text>
+<line x1="52" x2="608" y1="113.19999999999999" y2="113.19999999999999" stroke="#2c2c2a" stroke-width="1"/>
+<text x="44" y="117.19999999999999" fill="#898781" font-size="11.5" text-anchor="end">80%</text>
+<line x1="52" x2="608" y1="54.0" y2="54.0" stroke="#2c2c2a" stroke-width="1"/>
+<text x="44" y="58.0" fill="#898781" font-size="11.5" text-anchor="end">100%</text>
+<text x="52.0" y="370" fill="#898781" font-size="11.5" text-anchor="middle">1</text>
+<text x="154.1" y="370" fill="#898781" font-size="11.5" text-anchor="middle">10</text>
+<text x="267.6" y="370" fill="#898781" font-size="11.5" text-anchor="middle">20</text>
+<text x="381.1" y="370" fill="#898781" font-size="11.5" text-anchor="middle">30</text>
+<text x="494.5" y="370" fill="#898781" font-size="11.5" text-anchor="middle">40</text>
+<text x="608.0" y="370" fill="#898781" font-size="11.5" text-anchor="middle">50</text>
+<text x="330" y="388" fill="#898781" font-size="12" text-anchor="middle">Number of top candidates considered (N)</text>
+<path d="M52.0,333.9L63.3,325.4L74.7,318.0L86.0,312.6L97.4,307.4L108.7,303.0L120.1,299.2L131.4,296.3L142.8,292.9L154.1,289.8L165.5,286.5L176.8,283.6L188.2,280.9L199.5,277.8L210.9,275.5L222.2,273.2L233.6,270.9L244.9,268.4L256.2,266.5L267.6,264.7L278.9,262.2L290.3,259.8L301.6,258.0L313.0,256.0L324.3,254.5L335.7,252.9L347.0,250.9L358.4,249.4L369.7,247.7L381.1,246.0L392.4,244.2L403.8,242.5L415.1,241.0L426.4,239.2L437.8,237.4L449.1,235.9L460.5,234.8L471.8,233.3L483.2,231.8L494.5,230.7L505.9,229.6L517.2,228.2L528.6,226.9L539.9,225.6L551.3,224.5L562.6,223.3L574.0,221.9L585.3,220.7L596.7,219.8L608.0,218.8" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="608.0" cy="218.8" r="4.5" fill="#d95926" stroke="#0d0d0d" stroke-width="2"/>
+<line x1="620.0" x2="634.0" y1="218.8" y2="218.8" stroke="#d95926" stroke-width="2" stroke-linecap="round"/>
+<text x="640.0" y="222.8" font-size="12"><tspan fill="#c3c2b7">Untrained </tspan><tspan fill="#ffffff" font-weight="650">44.3%</tspan></text>
+<path d="M52.0,265.9L63.3,228.9L74.7,205.3L86.0,188.7L97.4,175.7L108.7,165.8L120.1,157.2L131.4,149.8L142.8,142.5L154.1,136.4L165.5,131.3L176.8,126.8L188.2,122.8L199.5,118.9L210.9,115.8L222.2,112.0L233.6,109.3L244.9,106.7L256.2,104.5L267.6,102.1L278.9,99.9L290.3,97.8L301.6,96.0L313.0,94.1L324.3,92.3L335.7,90.5L347.0,89.4L358.4,88.1L369.7,86.5L381.1,85.4L392.4,84.0L403.8,83.1L415.1,81.9L426.4,81.0L437.8,80.5L449.1,79.7L460.5,78.5L471.8,77.6L483.2,76.9L494.5,76.1L505.9,75.5L517.2,74.6L528.6,74.0L539.9,73.4L551.3,72.8L562.6,72.2L574.0,71.8L585.3,71.3L596.7,70.7L608.0,70.2" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="608.0" cy="70.2" r="4.5" fill="#3987e5" stroke="#0d0d0d" stroke-width="2"/>
+<line x1="620.0" x2="634.0" y1="70.2" y2="70.2" stroke="#3987e5" stroke-width="2" stroke-linecap="round"/>
+<text x="640.0" y="74.2" font-size="12"><tspan fill="#c3c2b7">Trained </tspan><tspan fill="#ffffff" font-weight="650">94.5%</tspan></text>
+<circle cx="52.0" cy="265.9" r="4.5" fill="#3987e5" stroke="#0d0d0d" stroke-width="2"/>
+<text x="62.0" y="256.9" font-size="12"><tspan fill="#ffffff" font-weight="650">28.4%</tspan><tspan fill="#c3c2b7"> top-1 (chance 0.1%)</tspan></text>
+</svg>

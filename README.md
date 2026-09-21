@@ -17,6 +17,27 @@ This is **not a classifier**. It's a 1:N gallery search built on a learned embed
 
 Subjects prove identity by **transcribing a random on-screen sentence** they've never seen before (not free composition, not a fixed password). The sentence varies every session, which rules out fixed-position features but forces the model to learn subject-specific rhythm rather than content-specific timing.
 
+## Results
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="eval/cmc_dark.svg">
+  <img alt="Cumulative match curve. The trained model places the correct person in the top 20 of 1,000 candidates 83.8% of the time, against 28.8% for an untrained network." src="eval/cmc_light.svg" width="100%">
+</picture>
+
+A 200,000-step model evaluated on **1,000 subjects held out of training entirely** — the split is by person, never by sample, so every identity here is one the network has never seen. Each is enrolled from 3 typing sessions and queried with a *different* sentence, so the model can't lean on what was typed. Figures are the mean ± standard deviation over 10 random draws of 1,000 subjects.
+
+| | Rank-1 | Rank-5 | Rank-10 | Rank-20 |
+|---|---|---|---|---|
+| **Trained (200k steps)** | **28.4% ± 1.3** | 58.9% ± 1.4 | 72.2% ± 2.0 | 83.8% ± 1.0 |
+| Untrained baseline | 5.4% | 14.4% | 20.4% | 28.8% |
+| Chance | 0.1% | 0.5% | 1.0% | 2.0% |
+
+Read Rank-20 as: the correct person is among the top 20 of 1,000 candidates 84% of the time. Median true rank is 4. The untrained row is the one that matters for calibration — raw timing features carry some signal even through a randomly initialized network, so that, not chance, is the honest floor.
+
+**Where this stands.** Accuracy plateaus after roughly 90k steps, and a diagnostic showed why: 78% of randomly drawn training triplets already satisfy the loss margin and contribute no gradient at all. Semi-hard negative mining (implemented, evaluation pending) cuts that to 0.1%. The protocol is also deliberately strict — each query is a single sentence, usually one window of at most 50 keystrokes, where a real system would pool several.
+
+Reproduce with `python -m eval.rank_n --seeds 0 1 2 3 4 5 6 7 8 9`, or open [`eval/dashboard.html`](eval/dashboard.html) for the full project timeline and per-checkpoint curves.
+
 ## Why This Framing Matters
 
 Keystroke biometrics is not a solved problem—particularly the generalization gap between transcription (controlled, read-then-copy) and free composition (spontaneous, think-then-type). This project validates the **embedding + ranking architecture** on a transcription proxy task. It's a real improvement over fixed-password datasets (forces generalization to unseen text, avoids memorizing one password's motor pattern) but carries a known domain gap against composed text. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full technical design, [FUTURE_PROSPECTS.md](FUTURE_PROSPECTS.md) for next steps (composition capture, cross-device evaluation), and [CLAUDE.md](CLAUDE.md) for how to contribute.
@@ -47,19 +68,19 @@ Serves on `http://localhost:5173`, CORS-allowed against the backend above.
 
 | Piece | Target (per [ARCHITECTURE.md](ARCHITECTURE.md)) | Current state |
 |---|---|---|
-| Feature extraction (`features/extract.py`) | Canonical HL/IL/PL/RL timing-vector extractor, shared byte-for-byte by training and live capture | Stub — raises `NotImplementedError`; not yet built against real Aalto data |
-| Model (`/model`) | 2-layer LSTM triplet-loss embedding network, trained on Aalto | Doesn't exist yet — no directory, no training script, no weights |
-| Embedding function (`backend/app/embedding.py`) | Frozen `f(features) -> 128-dim embedding` | Stub — raises `NotImplementedError` until a trained model lands |
+| Feature extraction (`features/extract.py`) | Canonical HL/IL/PL/RL timing-vector extractor, shared byte-for-byte by training and live capture | **Done** — single implementation used by both paths, 12 unit tests, 25-keystroke floor enforced per window |
+| Model (`/model`) | 2-layer LSTM triplet-loss embedding network, trained on Aalto | **Done** — 217k-parameter encoder trained 200k steps; 28.4% Rank-1 on held-out subjects (see [Results](#results)) |
+| Embedding function (`backend/app/embedding.py`) | Frozen `f(features) -> 128-dim embedding` | Stub — raises `NotImplementedError`; weights now exist, so this is the next piece of work |
 | Gallery store (`backend/app/gallery.py`) | SQLite table of `{person_id, name, embedding, enrolled_at}` | **Done** — implemented and working |
 | `/enroll`, `/identify` endpoints | Full extract → embed → pool/rank flow | Routing, schemas, pooling, and ranking logic are fully written and correct, but unreachable — both endpoints return `501` until extraction/embedding are implemented |
 | Frontend capture UI | Prompt display, capture, submit to backend, render top-5 results | Prompt display + capture + client-side rhythm visualization work; **not yet wired to the backend** (enroll/identify calls are a TODO) |
-| Evaluation (`/eval`) | CMC curve, Rank-N accuracy | Doesn't exist yet — depends on a trained model |
-| Data (`/data`) | Cached preprocessed Aalto sequences | Doesn't exist yet — dataset not yet downloaded/prepared |
+| Evaluation (`/eval`) | CMC curve, Rank-N accuracy | **Done** — multi-seed Rank-N/CMC over held-out subjects, plus an HTML progress dashboard |
+| Data (`/data`) | Cached preprocessed Aalto sequences | **Done** — 2.48M windows from 168,593 participants, cached as `.npy`; subject-disjoint split saved to `split.json` |
 
-In short: the **application skeleton is real and correct** (API contracts, gallery persistence,
-ranking/thresholding logic, frontend capture), but the **ML core is not built** — no feature
-extractor, no trained embedding model. That's the critical path; everything downstream of it is
-already waiting and wired up.
+In short: the **ML core now works end to end** — canonical feature extraction, a trained
+embedding model, and a held-out evaluation that says how well it performs. The remaining gap is
+the **join between the two halves**: `embedding.py` still needs to load the trained weights, which
+is what unblocks `/enroll` and `/identify` and, in turn, the frontend wiring.
 
 ## How It Works
 
@@ -77,10 +98,10 @@ already waiting and wired up.
 ## Repo Structure
 
 ```
-/data/        Aalto dataset (raw + preprocessed) — not yet populated
-/features/    canonical feature-extraction module — stubbed
-/model/       network definition, training script, weights — not yet created
-/eval/        CMC curve, Rank-N accuracy scripts — not yet created
+/data/        Aalto loader, cache builder, subject-disjoint split (preprocessed arrays gitignored)
+/features/    canonical feature-extraction module + unit tests
+/model/       LSTM encoder, triplet loss, triplet sampler, training script (weights gitignored)
+/eval/        Rank-N / CMC evaluation, progress dashboard
 /backend/     FastAPI app: gallery store (done), /enroll + /identify (wired, blocked on model)
 /frontend/    Vite + Tailwind capture UI (working, not yet wired to backend)
 
