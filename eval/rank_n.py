@@ -59,20 +59,21 @@ def load_eval_data():
     return windows, mask, eval_rows, rows_by_session
 
 
-def select_sessions(rows_by_session, num_subjects, enroll_sessions, rng):
-    """Return {subject: (enroll_session_ids, probe_session_id)} for sampled eval subjects."""
+def select_sessions(rows_by_session, num_subjects, enroll_sessions, rng, probe_sessions=1):
+    """Return {subject: (enroll_session_ids, probe_session_ids)} for sampled eval subjects."""
     sessions_by_subject: dict[str, list] = {}
     for subject, session in rows_by_session:
         sessions_by_subject.setdefault(subject, []).append(session)
 
-    eligible = sorted(s for s, sess in sessions_by_subject.items() if len(sess) >= enroll_sessions + 1)
+    need = enroll_sessions + probe_sessions
+    eligible = sorted(s for s, sess in sessions_by_subject.items() if len(sess) >= need)
     chosen = rng.choice(eligible, size=min(num_subjects, len(eligible)), replace=False)
 
     plan = {}
     for subject in chosen:
         sessions = sorted(sessions_by_subject[subject])
         rng.shuffle(sessions)
-        plan[subject] = (sessions[:enroll_sessions], sessions[enroll_sessions])
+        plan[subject] = (sessions[:enroll_sessions], sessions[enroll_sessions:need])
     return plan
 
 
@@ -93,28 +94,46 @@ def pooled_embedding(embeddings: np.ndarray) -> np.ndarray:
     return mean / np.linalg.norm(mean)
 
 
-def ranks_for_seed(embeddings, eval_rows, rows_by_session, seed, num_subjects, enroll_sessions) -> np.ndarray:
-    """For each probe, the 1-based rank of its true identity among the gallery."""
-    plan = select_sessions(rows_by_session, num_subjects, enroll_sessions, np.random.default_rng(seed))
+def ranks_for_seed(embeddings, eval_rows, rows_by_session, seed, num_subjects, enroll_sessions,
+                   probe_sessions=1, score="mean") -> np.ndarray:
+    """For each probe subject, the 1-based rank of its true identity among the gallery.
+
+    score="mean":     average each subject's window embeddings into one profile (gallery) and one
+                      query vector, compare by cosine similarity. The original protocol.
+    score="pairwise": TypeNet's rule. Keep one embedding per session, and score a (query subject,
+                      gallery subject) pair by the mean Euclidean distance over all query x gallery
+                      session pairs; smallest distance wins.
+    """
+    plan = select_sessions(rows_by_session, num_subjects, enroll_sessions, np.random.default_rng(seed), probe_sessions)
 
     def pooled(subject, sessions):
         rows = np.concatenate([rows_by_session[(subject, s)] for s in sessions])
         return pooled_embedding(embeddings[np.searchsorted(eval_rows, rows)])
 
-    gallery = np.stack([pooled(s, enroll) for s, (enroll, _) in plan.items()])
-    probes = np.stack([pooled(s, [probe]) for s, (_, probe) in plan.items()])
+    if score == "mean":
+        gallery = np.stack([pooled(s, enroll) for s, (enroll, _) in plan.items()])
+        probes = np.stack([pooled(s, probe) for s, (_, probe) in plan.items()])
+        scores = probes @ gallery.T  # (num_probes, num_gallery), cosine similarity, higher = closer
+    else:
+        gallery = np.stack([[pooled(s, [x]) for x in enroll] for s, (enroll, _) in plan.items()])  # (N, G, D)
+        probes = np.stack([[pooled(s, [x]) for x in probe] for s, (_, probe) in plan.items()])      # (N, Q, D)
+        scores = np.empty((len(plan), len(plan)), dtype=np.float32)
+        for start in range(0, len(plan), 100):  # chunk over probes to bound the (100, N, Q, G) tensor
+            sims = np.einsum("iqd,jgd->ijqg", probes[start:start + 100], gallery)
+            scores[start:start + 100] = -np.sqrt(np.clip(2 - 2 * sims, 0, None)).mean(axis=(2, 3))
 
-    scores = probes @ gallery.T  # (num_probes, num_gallery), cosine similarity
     true_scores = np.diag(scores)[:, None]
     return 1 + (scores > true_scores).sum(axis=1)
 
 
-def evaluate_model(model, data, device, seeds, num_subjects=1000, enroll_sessions=3) -> list[np.ndarray]:
+def evaluate_model(model, data, device, seeds, num_subjects=1000, enroll_sessions=3,
+                   probe_sessions=1, score="mean") -> list[np.ndarray]:
     """One ranks array per seed. Embeds all held-out windows once, then reuses them for every seed."""
     windows, mask, eval_rows, rows_by_session = data
     embeddings = embed_rows(model, windows, mask, eval_rows, device)
     return [
-        ranks_for_seed(embeddings, eval_rows, rows_by_session, seed, num_subjects, enroll_sessions)
+        ranks_for_seed(embeddings, eval_rows, rows_by_session, seed, num_subjects, enroll_sessions,
+                       probe_sessions, score)
         for seed in seeds
     ]
 
@@ -135,6 +154,10 @@ def main():
     parser.add_argument("--checkpoint", nargs="+", default=[str(CHECKPOINT_PATH)])
     parser.add_argument("--num-subjects", type=int, default=1000)
     parser.add_argument("--enroll-sessions", type=int, default=3)
+    parser.add_argument("--probe-sessions", type=int, default=1,
+                        help="query sessions per subject (TypeNet uses 5)")
+    parser.add_argument("--score", choices=["mean", "pairwise"], default="mean",
+                        help="mean: cosine on averaged profiles; pairwise: TypeNet's mean pairwise distance")
     parser.add_argument("--seeds", type=int, nargs="+", default=[0])
     parser.add_argument("--untrained", action="store_true", help="random-weights baseline")
     args = parser.parse_args()
@@ -144,15 +167,19 @@ def main():
 
     runs = [("untrained", None)] if args.untrained else [(Path(c).name, c) for c in args.checkpoint]
 
-    print(f"gallery={args.num_subjects} subjects, {args.enroll_sessions} enroll sessions, "
+    print(f"{args.enroll_sessions} enroll + {args.probe_sessions} query session(s) per subject, score={args.score}, "
           f"{len(args.seeds)} seed(s); Rank-N accuracy % (mean  +- std across seeds)")
-    print(f"{'checkpoint':<26}" + "".join(f"{'Rank-' + str(n):>16}" for n in RANKS_REPORTED))
+    print(f"{'checkpoint':<30}" + "".join(f"{'Rank-' + str(n):>16}" for n in RANKS_REPORTED))
+    gallery_size = args.num_subjects
     for label, path in runs:
         model = load_encoder(path, args.untrained, device)
-        ranks_per_seed = evaluate_model(model, data, device, args.seeds, args.num_subjects, args.enroll_sessions)
+        ranks_per_seed = evaluate_model(model, data, device, args.seeds, args.num_subjects,
+                                        args.enroll_sessions, args.probe_sessions, args.score)
+        gallery_size = len(ranks_per_seed[0])
         mean, std = summarize(ranks_per_seed)
-        print(f"{label:<26}" + "".join(f"{100 * m:>9.1f}  +- {100 * s:<4.1f}" for m, s in zip(mean, std)))
-    print(f"chance Rank-1 = {1 / args.num_subjects:.2%}")
+        print(f"{label:<30}" + "".join(f"{100 * m:>9.1f}  +- {100 * s:<4.1f}" for m, s in zip(mean, std)))
+    note = "" if gallery_size == args.num_subjects else f"  (only {gallery_size} eligible subjects; requested {args.num_subjects})"
+    print(f"gallery = {gallery_size} subjects, chance Rank-1 = {1 / gallery_size:.2%}{note}")
 
 
 if __name__ == "__main__":

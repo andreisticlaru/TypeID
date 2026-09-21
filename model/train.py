@@ -101,7 +101,26 @@ def mine_semi_hard(anchor, positive, negative, same_subject, margin: float = MAR
 
     return d_ap.squeeze(1), d_an.gather(1, idx[:, None]).squeeze(1)
 
-def train_step(model: KeystrokeEncoder, optimizer: torch.optim.Optimizer, batch: dict, mine: bool = False) -> float:
+
+def mine_hardest(anchor, positive, negative, same_subject):
+    """Swap each anchor's negative for the closest valid candidate in the batch.
+
+    Same candidate pool and same-subject mask as `mine_semi_hard`, but with no
+    "farther than the positive" filter: the pick can be a negative that is
+    already closer to the anchor than its own positive is, i.e. a live ranking
+    error. Semi-hard never trains on those; identification is scored on exactly
+    those. The cost is exposure to outlier negatives (near-identical typists,
+    mislabeled sessions), so it is meant to run from an already-trained model.
+
+    Returns (d_ap, d_an) so the caller can form the loss.
+    """
+    pool = torch.cat([positive, negative])
+    d_ap = 1 - (anchor * positive).sum(1)
+    d_an = (1 - anchor @ pool.T).masked_fill(same_subject, float("inf"))
+    return d_ap, d_an.min(1).values
+
+
+def train_step(model: KeystrokeEncoder, optimizer: torch.optim.Optimizer, batch: dict, mine: str | None = None) -> float:
     """One optimization step on a batch of tensors. Returns the loss as a float.
 
     Note: anchor, positive and negative all go through the SAME model instance --
@@ -130,7 +149,8 @@ def train_step(model: KeystrokeEncoder, optimizer: torch.optim.Optimizer, batch:
         same_subject = torch.from_numpy(
             batch["anchor_subjects"][:, None] == pool_subjects[None, :]
         ).to(anchor.device)
-        d_ap, d_an = mine_semi_hard(anchor, positive, negative, same_subject)
+        miner = mine_hardest if mine == "hard" else mine_semi_hard
+        d_ap, d_an = miner(anchor, positive, negative, same_subject)
         loss = torch.clamp(d_ap - d_an + MARGIN, min=0).mean()
     else:
         loss = triplet_loss(anchor, positive, negative)
@@ -197,8 +217,9 @@ def main():
                         help="also save encoder_step<N>.pt every N steps (0 = only save at the end)")
     parser.add_argument("--resume", default=None,
                         help="checkpoint to continue from; --steps is then the TOTAL target, not extra steps")
-    parser.add_argument("--mine", action="store_true",
-                        help="semi-hard in-batch negative mining instead of the randomly sampled negative")
+    parser.add_argument("--mine", nargs="?", const="semi", default=None, choices=["semi", "hard"],
+                        help="in-batch negative mining instead of the randomly sampled negative: "
+                             "'semi' (default when the flag is given bare) or 'hard'")
     parser.add_argument("--out", default=str(CHECKPOINT_PATH),
                         help="where to write the final checkpoint; --save-every files get a _step<N> suffix")
     args = parser.parse_args()
