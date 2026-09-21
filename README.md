@@ -21,22 +21,32 @@ Subjects prove identity by **transcribing a random on-screen sentence** they've 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="eval/cmc_dark.svg">
-  <img alt="Cumulative match curve. The trained model places the correct person in the top 20 of 1,000 candidates 83.8% of the time, against 28.8% for an untrained network." src="eval/cmc_light.svg" width="100%">
+  <img alt="Cumulative match curve. The trained model places the correct person in the top 20 of 1,000 candidates 96.1% of the time, against 28.8% for an untrained network." src="eval/cmc_light.svg" width="100%">
 </picture>
 
-A 200,000-step model evaluated on **1,000 subjects held out of training entirely** — the split is by person, never by sample, so every identity here is one the network has never seen. Each is enrolled from 3 typing sessions and queried with a *different* sentence, so the model can't lean on what was typed. Figures are the mean ± standard deviation over 10 random draws of 1,000 subjects.
+A 500,000-step model (200k steps with random negatives, then 300k with **hard negative mining**) evaluated on **1,000 subjects held out of training entirely** — the split is by person, never by sample, so every identity here is one the network has never seen. Each is enrolled from 3 typing sessions and queried with a *different* sentence, so the model can't lean on what was typed. Figures are the mean ± standard deviation over 10 random draws of 1,000 subjects.
 
 | | Rank-1 | Rank-5 | Rank-10 | Rank-20 |
 |---|---|---|---|---|
-| **Trained (200k steps)** | **28.4% ± 1.3** | 58.9% ± 1.4 | 72.2% ± 2.0 | 83.8% ± 1.0 |
-| Untrained baseline | 5.4% | 14.4% | 20.4% | 28.8% |
+| **Hardest-negative model (500k steps)** | **56.9% ± 1.7** | 84.6% ± 1.4 | 91.9% ± 0.7 | 96.1% ± 0.6 |
+| Random-negative baseline (200k steps) | 28.4% ± 1.3 | 58.9% ± 1.4 | 72.2% ± 2.0 | 83.8% ± 1.0 |
+| Untrained network | 5.4% | 14.4% | 20.4% | 28.8% |
 | Chance | 0.1% | 0.5% | 1.0% | 2.0% |
 
-Read Rank-20 as: the correct person is among the top 20 of 1,000 candidates 84% of the time. Median true rank is 4. The untrained row is the one that matters for calibration — raw timing features carry some signal even through a randomly initialized network, so that, not chance, is the honest floor.
+Read Rank-20 as: the correct person is among the top 20 of 1,000 candidates 96% of the time. The untrained row is the one that matters for calibration — raw timing features carry some signal even through a randomly initialized network, so that, not chance, is the honest floor.
 
-**Where this stands.** Accuracy plateaus after roughly 90k steps, and a diagnostic showed why: 78% of randomly drawn training triplets already satisfy the loss margin and contribute no gradient at all. Semi-hard negative mining (implemented, evaluation pending) cuts that to 0.1%. The protocol is also deliberately strict — each query is a single sentence, usually one window of at most 50 keystrokes, where a real system would pool several.
+**With more data per person.** The test above is deliberately strict: one short query per person. The [TypeNet paper](https://arxiv.org/abs/2101.05570) reports identification with 10 enrollment and 5 query sequences per person, scored by mean pairwise distance, and gets 67.4% Rank-1 for its triplet model on a 1,000-person gallery. Under that same protocol:
 
-Reproduce with `python -m eval.rank_n --seeds 0 1 2 3 4 5 6 7 8 9`, or open [`eval/dashboard.html`](eval/dashboard.html) for the full project timeline and per-checkpoint curves.
+| Rank-1, 1,000 people, 10 enroll + 5 query sessions | Pairwise distance (TypeNet's rule) | Averaged profile |
+|---|---|---|
+| Random-negative baseline (200k) | 65.2% | 82.4% |
+| **Hardest-negative model (500k)** | **93.3%** | **98.0%** |
+
+The protocols are close but not identical: our windows can pool several per session, only people with 15 or more usable sessions are eligible, and TypeNet also feeds the key code in as an input (this model does not). Averaging a person's enrollment embeddings into one profile beats averaging pairwise distances, which is what the backend's pooling is designed to do.
+
+**How it got here.** Accuracy plateaued at 28% after roughly 90k steps of random negatives, and a diagnostic showed why: 78% of randomly drawn training triplets already satisfied the loss margin and contributed no gradient. Replacing each random negative with a harder one from the same batch raised Rank-1 to 51.7% (semi-hard), and taking the closest negative regardless (hardest) to 56.9% at equal compute. A control that simply trained 100k more steps with random negatives gained 0.8 points, so the improvement comes from which negatives are used, not from training longer. The hardest-negative curve is now flattening.
+
+Reproduce with `python -m eval.rank_n --seeds 0 1 2 3 4 5 6 7 8 9` (add `--enroll-sessions 10 --probe-sessions 5 --score pairwise` for the TypeNet-style protocol), or open [`eval/dashboard.html`](eval/dashboard.html) for the full project timeline and per-checkpoint curves.
 
 ## Why This Framing Matters
 
@@ -69,7 +79,7 @@ Serves on `http://localhost:5173`, CORS-allowed against the backend above.
 | Piece | Target (per [ARCHITECTURE.md](ARCHITECTURE.md)) | Current state |
 |---|---|---|
 | Feature extraction (`features/extract.py`) | Canonical HL/IL/PL/RL timing-vector extractor, shared byte-for-byte by training and live capture | **Done** — single implementation used by both paths, 12 unit tests, 25-keystroke floor enforced per window |
-| Model (`/model`) | 2-layer LSTM triplet-loss embedding network, trained on Aalto | **Done** — 217k-parameter encoder trained 200k steps; 28.4% Rank-1 on held-out subjects (see [Results](#results)) |
+| Model (`/model`) | 2-layer LSTM triplet-loss embedding network, trained on Aalto | **Done** — 217k-parameter encoder trained 500k steps with hard negative mining; 56.9% Rank-1 on held-out subjects (see [Results](#results)) |
 | Embedding function (`backend/app/embedding.py`) | Frozen `f(features) -> 128-dim embedding` | Stub — raises `NotImplementedError`; weights now exist, so this is the next piece of work |
 | Gallery store (`backend/app/gallery.py`) | SQLite table of `{person_id, name, embedding, enrolled_at}` | **Done** — implemented and working |
 | `/enroll`, `/identify` endpoints | Full extract → embed → pool/rank flow | Routing, schemas, pooling, and ranking logic are fully written and correct, but unreachable — both endpoints return `501` until extraction/embedding are implemented |

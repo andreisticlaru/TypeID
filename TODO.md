@@ -66,36 +66,34 @@ Essential foundation—everything downstream depends on this.
   - ✅ Sample subject X (2+ sessions), draw two different sessions (A, P); sample different subject Y, draw one session (N)
   - ✅ Fresh triplets per batch (not precomputed); `sample_batch` stacks them; ~0.1 ms/triplet
   - ✅ Optional `subjects` allowlist for the train/eval split
-  - Future: add hard negative mining after warmup
+  - ✅ Hard negative mining added later, in-batch (see `model/train.py` below); candidates larger than one batch are still untried
 
 - [x] **Subject-disjoint train/eval split** (`data/make_split.py` → `data/split.json`)
   - ✅ 90/10 by subject, seed 42, saved so train and eval share the same held-out set (151,734 / 16,859)
 
-- [ ] **Training script (`model/train.py`)**
-  - Scaffolded (`build_sampler`, `to_tensors`, `train_step`, `save_checkpoint`, `main`); run from `.venv-model` (system Python has no torch)
-  - Load preprocessed Aalto sequences
-  - Batch triplets, forward pass, backprop
-  - Adam optimizer, lr ≈ 1e-3
-  - Log loss per batch
-  - Save checkpoint every N epochs
-  - Validate: Run training on subset (e.g., 100 subjects, 5-10 epochs) to verify convergence
+- [x] **Training script (`model/train.py`)**
+  - ✅ Adam (lr 1e-3), batches of 64 triplets sampled fresh each step; runs from `.venv-model` (system Python has no torch)
+  - ✅ `--save-every` numbered checkpoints, `--resume` (weights + Adam state), `--out`, checkpoints bundle weights + config
+  - ✅ In-batch negative mining: `--mine semi` (closest negative still farther than the positive) and `--mine hard` (closest valid negative); candidates from the anchor's own subject are masked out
+  - Why mining: after 200k steps 78% of random triplets gave zero loss, which explains the plateau
 
-- [ ] **Evaluate on held-out subjects**
-  - Split Aalto: train on subjects 1-800, eval on 801-1000 (example split)
-  - Build gallery from eval subjects (2-3 sessions each)
-  - Query with held-out sessions from same subjects
-  - Compute Rank-N accuracy (N=1,5,10) and CMC curve
-  - Compare against TypeNet published baseline (~80% Rank-1 on similar protocol)
+- [x] **Evaluate on held-out subjects** (`eval/rank_n.py`)
+  - ✅ Subject-disjoint split (151,734 train / 16,859 held-out), gallery of 1,000 held-out people, 10 random draws, mean ± std
+  - ✅ Rank-1/5/10/20 (CMC data in the dashboard); untrained baseline included
+  - ✅ Also runs the TypeNet-style protocol (`--enroll-sessions 10 --probe-sessions 5 --score pairwise`)
+  - Standard protocol (3 enroll + 1 query), Rank-1: untrained 5.4% → 200k random negatives 28.4% → 500k semi-hard 51.7% → **500k hardest 56.9%**
+  - TypeNet-style protocol, Rank-1: 200k baseline 65.2% (paper: 67.4%) → **hardest 93.3%** (98.0% with averaged profiles)
+  - Not yet done: verification EER for a like-for-like comparison with TypeNet's headline metric
 
-- [ ] **Save trained weights**
-  - Serialize model to `/model/weights.pth` (or `.pt` / `.h5`)
-  - Save training config (feature dims, embedding dim, loss margin)
-  - Document model version and Aalto subset used
+- [x] **Save trained weights**
+  - ✅ `model/encoder_hard.pt` (500k steps, hardest mining) is the current best; `model/*.pt` is gitignored
+  - ✅ Checkpoint stores `state_dict` + config (model kwargs, margin, lr, split seed, mining mode) + Adam state
+  - Still to do: the backend must load this file (see Phase 3)
 
 ## Phase 3: Backend Inference & API
 
 - [ ] **Implement embedding function (`backend/app/embedding.py`)**
-  - Load frozen weights from `/model/weights.pth`
+  - Load frozen weights from `model/encoder_hard.pt` (the current best; build `KeystrokeEncoder(**ckpt["config"]["model"])`, then `load_state_dict(ckpt["state_dict"])`, then `.eval()`)
   - `embed(features: np.array) -> np.array` function
   - Input: (M=50, 4) or (batch, M=50, 4)
   - Output: 128-dim embedding, L2 normalized

@@ -43,7 +43,9 @@ Because transcribed text differs every session, fixed-position features don't wo
 - **PL** (press latency): `press(n+1) - press(n)`
 - **RL** (release latency): `release(n+1) - release(n)`
 
-One vector per keystroke yields a variable-length sequence. Omit key identity from input by default (TypeNet design choice)—a model seeing only timing is forced to learn typing rhythm rather than memorizing content, which is what generalizes to unseen text.
+One vector per keystroke yields a variable-length sequence. This project's model sees **timing only, not key identity**—a model seeing only timing is forced to learn typing rhythm rather than memorizing content, which is what generalizes to unseen text.
+
+**This deliberately differs from TypeNet.** Reading the paper (Acien et al., 2021) showed that TypeNet feeds the **key code** in as a fifth input feature, scaled to 0–1 (`N × 5` input), so an earlier version of this document was wrong to call timing-only a TypeNet choice. The paper checked whether that lets the model learn the typed text instead of the rhythm: on desktop it does not (embedding distances show no correlation with the edit distance between texts), while on mobile it does. So the key code is a plausible accuracy gain here that has not been tried; it would touch the extractor, the cache and retraining.
 
 **Fixed window:** Pad/truncate sequences to `M = 50` keystrokes. Longer samples are split into non-overlapping windows; shorter ones are zero-padded with a mask. Keep this value identical between training and live capture.
 
