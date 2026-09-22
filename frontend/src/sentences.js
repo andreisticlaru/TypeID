@@ -33,9 +33,8 @@ const SENTENCES = [
   "give me two minutes, im just finishing something up",
 ];
 
-export function pickSentence(exclude) {
-  const pool = exclude
-    ? SENTENCES.filter((s) => s !== exclude)
-    : SENTENCES;
+// `exclude`: sentences to avoid (so enrollment never repeats one).
+export function pickSentence(exclude = []) {
+  const pool = SENTENCES.filter((s) => !exclude.includes(s));
   return pool[Math.floor(Math.random() * pool.length)];
 }

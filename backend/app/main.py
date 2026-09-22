@@ -36,7 +36,11 @@ app = FastAPI(title="TypeID backend", lifespan=lifespan)
 # in parallel to the existing plain-JS one.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://frlnfv6t-5173.euw.devtunnels.ms",  # dev tunnel forwarding the frontend port
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,9 +48,9 @@ app.add_middleware(
 
 app.include_router(enroll.router)
 app.include_router(identify.router)
+app.include_router(map_router.router)
 
 
 @app.get("/health")
 def health() -> dict:
-app.include_router(map_router.router)
     return {"status": "ok"}

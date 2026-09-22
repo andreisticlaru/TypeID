@@ -132,13 +132,13 @@ Essential foundation—everything downstream depends on this.
 
 ## Phase 4: Frontend Wiring
 
-- [ ] **Connect enroll form to `/enroll` endpoint**
+- [x] **Connect enroll form to `/enroll` endpoint**
   - Capture user name input
   - Capture 2-3 keystroke event sequences (browser already logs events)
   - POST to backend `/enroll`
   - Display confirmation with person_id or error message
 
-- [ ] **Connect identify form to `/identify` endpoint**
+- [x] **Connect identify form to `/identify` endpoint**
   - Capture unknown keystroke event sequence
   - POST to backend `/identify`
   - Render top-5 results with similarity scores
