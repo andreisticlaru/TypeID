@@ -202,6 +202,57 @@ future direction if the project needs a stronger privacy story, but isn't
 required at portfolio-demo scope, which isn't processing real users' data
 under a live consent regime.
 
+## 8. Can the system explain a match or non-match in terms of typing behaviour?
+
+**Yes, but the LSTM embedding is a black box, so the explanation has to be
+built around it rather than read out of it.** Four approaches, in rising
+effort:
+
+1. **Counterfactual tests (best first step).** Perturb the query's timing
+   features one behaviour at a time (scale all times slower or faster,
+   stretch only the pauses to mimic bursts, shrink key overlap) and re-run
+   the model. The change in cosine similarity to the enrolled profile is the
+   explanation: "the score rises by 0.09 if typed ~15% faster, so this
+   sample was slower than the enrolled rhythm." It uses the real model's
+   behaviour, needs no extra stored data, and speaks the slower / faster /
+   bursty language directly.
+2. **Per-keystroke attribution.** A gradient method such as Integrated
+   Gradients (PyTorch autograd is enough) scores how much each keystroke and
+   each timing feature (HL/IL/PL/RL) moved the similarity. Caveat: an LSTM
+   mixes context across positions, so credit is smeared. The backend knows
+   which key sat at each position, so it can label positions with the
+   character for display only; the model itself never sees key identity.
+3. **Plain descriptions of the query** (speed, dwell, pause count,
+   burstiness). Cheap, but "slower than usual" needs a stored baseline of the
+   enrolled person's averages. That conflicts with the current "only the
+   vector is stored" line (see section 7), so it would have to be a
+   deliberate, opt-in privacy trade-off.
+4. **A one-off study of what the embedding encodes:** correlate the 128
+   dimensions (or colour the embedding map) by typing speed and burstiness
+   across Aalto people. A global explanation of the model, not of one
+   decision.
+
+**Explanations must themselves be evaluated.** Attribution methods can
+produce plausible but wrong stories. The standard check is a deletion test:
+remove the keystrokes an explanation ranks most important and confirm the
+similarity drops more than when removing random keystrokes. Any
+explanation feature should ship with that check, consistent with the rest of
+the project's evaluate-before-trusting approach.
+
+**Failed authentication is the harder case.** With one short sentence the
+score is noisy (single-query Rank-1 on 1,000 people is about 63%), so many
+failures come from sample noise, not a real change in behaviour. The
+explanation should be able to say "no clear cause" instead of forcing a
+story.
+
+**LLM link (section 4 covers a different use).** Once these methods produce
+numbers, an LLM could phrase them in plain language. It should narrate
+computed results only and never invent causes, and it should receive
+derived numbers (scores, attributions), not raw keystrokes or vectors.
+
+**Decision for now:** not built. If pursued, start with counterfactual
+speed and pause scaling plus the deletion-test check, then add attribution.
+
 ## Sources
 
 - [Observations on Typing from 136 Million Keystrokes (Dhakal et al., CHI 2018)](https://dl.acm.org/doi/10.1145/3173574.3174220) — the Aalto dataset this project trains on. [Free PDF](https://acris.aalto.fi/ws/portalfiles/portal/21495207/ELEC_Dhakal_et_al_Observations_CHI2018.pdf), [dataset download](https://userinterfaces.aalto.fi/136Mkeystrokes/).
@@ -229,3 +280,7 @@ under a live consent regime.
 **Data protection:**
 - [GDPR Article 4 — Definitions, incl. "personal data" and "biometric data" (gdpr-info.eu)](https://gdpr-info.eu/art-4-gdpr/)
 - [GDPR Article 9 — Processing of special categories of personal data (gdpr-info.eu)](https://gdpr-info.eu/art-9-gdpr/)
+
+**Explainability:**
+- [Axiomatic Attribution for Deep Networks: Integrated Gradients (Sundararajan et al., arXiv)](https://arxiv.org/abs/1703.01365)
+- [RISE: Randomized Input Sampling for Explanation of Black-box Models — deletion/insertion metrics (Petsiuk et al., arXiv)](https://arxiv.org/abs/1806.07421)
