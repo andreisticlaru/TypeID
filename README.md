@@ -42,11 +42,23 @@ Read Rank-20 as: the correct person is among the top 20 of 1,000 candidates 96% 
 | Random-negative baseline (200k) | 65.2% | 82.4% |
 | **Hardest-negative model (500k)** | **93.3%** | **98.0%** |
 
-The protocols are close but not identical: our windows can pool several per session, only people with 15 or more usable sessions are eligible, and TypeNet also feeds the key code in as an input (this model does not). Averaging a person's enrollment embeddings into one profile beats averaging pairwise distances, which is what the backend's pooling is designed to do.
+Those two columns sample 15 random sessions per person and pool every window of a session, so they are a little friendlier than the paper. `eval/typenet_protocol.py` follows the paper literally: each person's first 15 sequences in time order, first 10 as gallery and last 5 as query, **one 50-keystroke window per sequence**, mean pairwise distance, and EER for authentication (per person, then averaged). Ten random draws of 1,000 held-out people:
+
+| Model | Rank-1 (1,000 people) | EER at 1 / 5 / 10 enrollment sequences |
+|---|---|---|
+| TypeNet, published (triplet, desktop, key code as input) | 67.4% | 5.4 / 2.2 / 1.6 |
+| Random-negative baseline (200k) | 60.5% | 5.43 / 2.57 / 2.01 |
+| Random-negative control (300k) | 61.8% | 5.35 / 2.56 / 1.97 |
+| Semi-hard mining (300k) | 82.1% | 4.09 / 1.34 / 0.90 |
+| Semi-hard mining (500k) | 85.2% | 3.48 / 1.04 / 0.73 |
+| **Hardest-negative (500k)** | **89.8%** | **3.01 / 0.81 / 0.55** |
+| Untrained network | 11.2% | 24.98 / 20.48 / 19.29 |
+
+The random-negative baseline lands on TypeNet's published one-sequence EER (5.43% vs 5.4%), which is the check that this evaluation is like-for-like; it sits below their Rank-1, consistent with this model not seeing the key code. Mining is what moves it past the paper. Caveats: TypeNet tests on 100,000 people and this test can only use the 3,771 held-out people with 15 sessions above the 25-keystroke floor, so its galleries overlap across draws; giving the hardest-negative model a gallery of all 3,771 lowers Rank-1 from 89.8% to 79.0%. The same model scores 90.2% on people it *trained* on, so there is no memorization gap. Averaging a person's enrollment embeddings into one profile beats averaging pairwise distances, which is what the backend's pooling does.
 
 **How it got here.** Accuracy plateaued at 28% after roughly 90k steps of random negatives, and a diagnostic showed why: 78% of randomly drawn training triplets already satisfied the loss margin and contributed no gradient. Replacing each random negative with a harder one from the same batch raised Rank-1 to 51.7% (semi-hard), and taking the closest negative regardless (hardest) to 56.9% at equal compute. A control that simply trained 100k more steps with random negatives gained 0.8 points, so the improvement comes from which negatives are used, not from training longer. The hardest-negative curve is now flattening.
 
-Reproduce with `python -m eval.rank_n --seeds 0 1 2 3 4 5 6 7 8 9` (add `--enroll-sessions 10 --probe-sessions 5 --score pairwise` for the TypeNet-style protocol), or open [`eval/dashboard.html`](eval/dashboard.html) for the full project timeline and per-checkpoint curves.
+Reproduce with `python -m eval.rank_n --seeds 0 1 2 3 4 5 6 7 8 9` (add `--enroll-sessions 10 --probe-sessions 5 --score pairwise` for the random-session TypeNet-style variant, or run `python -m eval.typenet_protocol --checkpoint model/encoder_hard.pt --seeds 0 1 2 3 4 5 6 7 8 9` for the strict one), or open [`eval/dashboard.html`](eval/dashboard.html) for the full project timeline and per-checkpoint curves.
 
 ## Why This Framing Matters
 

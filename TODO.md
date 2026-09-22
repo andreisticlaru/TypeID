@@ -83,7 +83,7 @@ Essential foundation—everything downstream depends on this.
   - ✅ Also runs the TypeNet-style protocol (`--enroll-sessions 10 --probe-sessions 5 --score pairwise`)
   - Standard protocol (3 enroll + 1 query), Rank-1: untrained 5.4% → 200k random negatives 28.4% → 500k semi-hard 51.7% → **500k hardest 56.9%**
   - TypeNet-style protocol, Rank-1: 200k baseline 65.2% (paper: 67.4%) → **hardest 93.3%** (98.0% with averaged profiles)
-  - Not yet done: verification EER for a like-for-like comparison with TypeNet's headline metric
+  - ✅ Verification EER and TypeNet's exact identification protocol: `python -m eval.typenet_protocol` (see README; hardest-negative model: 89.8% Rank-1, EER 0.81% at 5 enrollment sequences vs TypeNet's 67.4% / 2.2%)
 
 - [x] **Save trained weights**
   - ✅ `model/encoder_hard.pt` (500k steps, hardest mining) is the current best; `model/*.pt` is gitignored
