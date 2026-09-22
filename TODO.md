@@ -88,24 +88,25 @@ Essential foundation—everything downstream depends on this.
 - [x] **Save trained weights**
   - ✅ `model/encoder_hard.pt` (500k steps, hardest mining) is the current best; `model/*.pt` is gitignored
   - ✅ Checkpoint stores `state_dict` + config (model kwargs, margin, lr, split seed, mining mode) + Adam state
-  - Still to do: the backend must load this file (see Phase 3)
+  - ✅ The backend loads this file (see Phase 3)
 
 ## Phase 3: Backend Inference & API
 
-- [ ] **Implement embedding function (`backend/app/embedding.py`)**
+- [x] **Implement embedding function (`backend/app/embedding.py`)**
   - Load frozen weights from `model/encoder_hard.pt` (the current best; build `KeystrokeEncoder(**ckpt["config"]["model"])`, then `load_state_dict(ckpt["state_dict"])`, then `.eval()`)
   - `embed(features: np.array) -> np.array` function
   - Input: (M=50, 4) or (batch, M=50, 4)
   - Output: 128-dim embedding, L2 normalized
   - Raise error if weights not found
-  - Replace `NotImplementedError` stub
+  - ✅ Multi-window sessions are averaged and re-normalized, matching the pooling `eval/rank_n.py` measured
+  - ✅ Backend needs torch: run it from `.venv-model` (`cd backend && ../.venv-model/Scripts/python -m uvicorn app.main:app --port 8000`)
 
 - [ ] **Implement gallery store (`backend/app/gallery.py`)**
   - ✅ Already done—SQLite table ready
   - Verify schema: `{person_id, name, embedding (128 floats), enrolled_at}`
   - Test insert/query operations
 
-- [ ] **Wire `/enroll` endpoint**
+- [x] **Wire `/enroll` endpoint**
   - POST `/enroll` with `{name, events: [{key, event_type, timestamp}, ...]}`
   - Call `features.extract.extract_features(events)` → array
   - Call `embed(features)` → 128-dim vector
@@ -114,7 +115,9 @@ Essential foundation—everything downstream depends on this.
   - Return `{person_id, name}` to client
   - Test: Enroll 3 sample users, verify gallery contains them
 
-- [ ] **Wire `/identify` endpoint**
+- [x] **Wire `/identify` endpoint**
+  - ✅ Too-short input returns HTTP 422 (the 25-keystroke floor)
+  - ✅ `MIN_CONFIDENCE = 0.7`, calibrated on held-out people (5 enroll sentences, 1 query): it accepts 88% of enrolled queries but also falsely accepts 65% of unenrolled ones, so a single-sentence "no match" is weak. Query with several sentences to sharpen it
   - POST `/identify` with `{events: [...]}`
   - Extract features, embed
   - Query gallery: `cosine_similarity(query_emb, all gallery embeddings)`

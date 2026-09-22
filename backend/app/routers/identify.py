@@ -1,10 +1,7 @@
 """POST /identify -- rank gallery entries by similarity to a query embedding.
 
-The ranking logic (rank_gallery) mirrors CLAUDE.md's identify() pseudocode
-exactly and is real, complete code, not a stub -- it just isn't reachable
-until extract_features()/embed() are implemented, since building the query
-embedding needs both. Feature extraction/embedding failures are surfaced as
-HTTP 501, same as /enroll.
+The ranking logic (rank_gallery) mirrors CLAUDE.md's identify() pseudocode.
+Queries with too few keystrokes are rejected with HTTP 422, same as /enroll.
 """
 
 import numpy as np
@@ -22,7 +19,7 @@ TOP_K = 5
 # Placeholder threshold below which the best candidate is considered "no
 # confident match" (CLAUDE.md's identify() pseudocode) -- tune once a trained
 # model produces real similarity distributions.
-MIN_CONFIDENCE = 0.5
+MIN_CONFIDENCE = 0.7
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
@@ -72,11 +69,8 @@ def identify(request: IdentifyRequest) -> IdentifyResponse:
         events = [event.model_dump() for event in request.events]
         features = extract_features(events)
         query_embedding = embed(features)
-    except NotImplementedError as exc:
-        raise HTTPException(
-            status_code=501,
-            detail="Feature extraction / embedding model not yet implemented",
-        ) from exc
+    except ValueError as exc:  # too few keystrokes (features.extract.MIN_KEYSTROKES)
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     gallery = get_all_entries()
     results, matched = rank_gallery(query_embedding, gallery)

@@ -1,11 +1,4 @@
-"""POST /enroll -- extract features, embed, and store a new gallery entry.
-
-Feature extraction and embedding are both unimplemented stubs right now (they
-depend on the Aalto dataset / trained model, which don't exist yet). This
-endpoint stays honest about that: it returns HTTP 501 rather than faking a
-successful enrollment, while the schema/routing/gallery-write plumbing is
-fully wired up for when the real model lands.
-"""
+"""POST /enroll -- extract features, embed, and store a new gallery entry."""
 
 import numpy as np
 from fastapi import APIRouter, HTTPException
@@ -27,14 +20,11 @@ def enroll(request: EnrollRequest) -> EnrollResponse:
             events = [event.model_dump() for event in session.events]
             features = extract_features(events)
             embeddings.append(embed(features))
-    except NotImplementedError as exc:
-        raise HTTPException(
-            status_code=501,
-            detail="Feature extraction / embedding model not yet implemented",
-        ) from exc
+    except ValueError as exc:  # too few keystrokes (features.extract.MIN_KEYSTROKES)
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     # Pool per-session embeddings (mean) into the single stored template, per
-    # CLAUDE.md's enrollment flow. Unreachable until embed() is implemented.
+    # CLAUDE.md's enrollment flow.
     pooled = np.mean(np.stack(embeddings), axis=0).tolist()
     entry = add_entry(request.person_id, request.name, pooled)
 
