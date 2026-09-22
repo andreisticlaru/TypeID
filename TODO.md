@@ -144,6 +144,11 @@ Essential foundation—everything downstream depends on this.
   - Render top-5 results with similarity scores
   - Optional: confidence threshold UI (accept match only if top score > threshold)
 
+- [x] **Embedding map (`GET /map`, `backend/app/static/map.html`)**
+  - ✅ Interactive 2-D map of the gallery: Aalto background grey and unnamed, enrolled people coloured and labelled, hover shows the full 128-number vector and the exact 128-D nearest neighbours
+  - ✅ Projection chosen by measurement on the 500 background profiles: UMAP (trustworthiness 0.95, 52% of true 10-NN kept) vs t-SNE (0.96, can't place new points) vs PCA (0.72). UMAP is fit once on the `aalto_*` background; new people are placed into that fixed layout, so existing points never move
+  - Needs `umap-learn` (in `backend/requirements.txt`); the first fit compiles for ~20 s, so the backend warms it up at startup. Seed the background with `backend/seed_aalto_gallery.py`
+
 - [ ] **Test end-to-end flow**
   - Enroll a test user in frontend
   - Query with new session of same user

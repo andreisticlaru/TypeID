@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TypeID Embedding Map</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --wash: #f0efec;
+    --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+    --border: rgba(11,11,11,0.10); --dot: rgba(137,135,129,0.55);
+    --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100;
+    --c5: #e87ba4; --c6: #008300; --c7: #4a3aa7; --c8: #e34948;
+    --pos: #2a78d6; --neg: #e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --wash: #262624;
+      --ink: #ffffff; --ink2: #c3c2b7; --muted: #898781;
+      --border: rgba(255,255,255,0.10); --dot: rgba(137,135,129,0.5);
+      --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500;
+      --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767;
+      --pos: #3987e5; --neg: #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --wash: #262624;
+    --ink: #ffffff; --ink2: #c3c2b7; --muted: #898781;
+    --border: rgba(255,255,255,0.10); --dot: rgba(137,135,129,0.5);
+    --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500;
+    --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767;
+    --pos: #3987e5; --neg: #e66767;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-variant-numeric: tabular-nums; }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 28px 16px 56px; }
+
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+  .sub { margin: 4px 0 0; color: var(--ink2); max-width: 70ch; }
+  .btn {
+    font: inherit; font-size: 13px; font-weight: 550; color: var(--ink); background: transparent;
+    border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; cursor: pointer;
+  }
+  .btn:hover { background: var(--wash); }
+  .btn:focus-visible, .chip:focus-visible, canvas:focus-visible { outline: 2px solid var(--c1); outline-offset: 2px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; min-height: 34px; }
+  .legend .label { color: var(--muted); font-size: 12px; margin-right: 4px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 13px; font-weight: 550;
+    color: var(--ink); background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 5px 12px 5px 10px; cursor: pointer;
+  }
+  .chip:hover, .chip[aria-pressed="true"] { background: var(--wash); }
+  .chip.static { cursor: default; color: var(--ink2); font-weight: 450; }
+  .swatch { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+
+  .stage { display: grid; grid-template-columns: minmax(0, 1fr) 392px; gap: 16px; align-items: start; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
+  .mapcard { position: relative; height: clamp(440px, calc(100vh - 250px), 820px); overflow: hidden; }
+  canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  canvas.hit { cursor: pointer; }
+  .overlay {
+    position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px;
+    color: var(--ink2); background: var(--surface); transition: opacity .2s;
+  }
+  .overlay.hidden { opacity: 0; pointer-events: none; }
+  .hint { position: absolute; left: 14px; bottom: 12px; color: var(--muted); font-size: 12px; pointer-events: none; }
+
+  .inspector { padding: 20px; position: sticky; top: 16px; }
+  .empty { color: var(--muted); }
+  .who { display: flex; align-items: center; gap: 10px; }
+  .who h2 { margin: 0; font-size: 18px; font-weight: 650; }
+  .meta { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+  h3 { margin: 20px 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .nn { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: baseline; }
+  .nn .val { font-weight: 650; }
+  .nn .nm { color: var(--ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vec { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
+  .vec span { font-size: 10.5px; text-align: right; padding: 2px 3px; border-radius: 4px; }
+  .vecfoot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; color: var(--muted); font-size: 12px; }
+  .scale { display: inline-flex; align-items: center; gap: 6px; }
+  .scale i { width: 26px; height: 8px; border-radius: 4px; display: inline-block; }
+
+  .note { margin: 14px 2px 0; color: var(--muted); font-size: 12px; max-width: 90ch; }
+  details { margin-top: 16px; }
+  summary { cursor: pointer; color: var(--ink2); font-weight: 550; }
+  .tablewrap { max-height: 360px; overflow: auto; margin-top: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { position: sticky; top: 0; background: var(--surface); color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; }
+
+  .stage > * { min-width: 0; } /* the canvas's own size must not stretch the grid */
+  @media (max-width: 960px) {
+    .stage { grid-template-columns: minmax(0, 1fr); }
+    .inspector { position: static; }
+    .mapcard { height: 62vh; }
+  }
+  @media (prefers-reduced-motion: reduce) { .overlay { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Embedding map</h1>
+      <p class="sub" id="sub">Each dot is one person's stored 128-number profile, flattened to two dimensions. Grey dots are held-out Aalto people; coloured dots are people enrolled here.</p>
+    </div>
+    <button class="btn" id="refresh" type="button">Refresh</button>
+  </header>
+
+  <div class="legend" id="legend" aria-label="People"></div>
+
+  <div class="stage">
+    <div class="card mapcard">
+      <canvas id="map" tabindex="0" aria-label="Scatter plot of enrolled people; use the people buttons above or the table below for keyboard access"></canvas>
+      <div class="overlay" id="overlay">Computing layout&hellip; the first load after the backend starts can take up to 30 seconds while UMAP compiles.</div>
+      <div class="hint">Scroll to zoom &middot; drag to pan &middot; click a dot to pin it</div>
+    </div>
+    <aside class="card inspector" id="inspector" aria-live="polite"></aside>
+  </div>
+
+  <p class="note">The axes have no units, and distances on the map are approximate: roughly half of a dot's true nearest neighbours stay nearby after flattening 128 dimensions to 2. Trust the &ldquo;Nearest in 128-D&rdquo; list, which is exact. Lines join the hovered dot to those neighbours.</p>
+
+  <details id="tableview">
+    <summary>Table view</summary>
+    <div class="tablewrap"><table id="table"></table></div>
+  </details>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script>
+(() => {
+  const themeParam = new URLSearchParams(location.search).get("theme"); // ?theme=dark|light overrides the OS setting
+  if (themeParam === "dark" || themeParam === "light") document.documentElement.dataset.theme = themeParam;
+  const dpr = window.devicePixelRatio || 1;
+  const canvas = document.getElementById("map");
+  const ctx = canvas.getContext("2d");
+  const inspector = document.getElementById("inspector");
+  const overlay = document.getElementById("overlay");
+  const legend = document.getElementById("legend");
+
+  let points = [], byId = new Map(), method = "";
+  let view = d3.zoomIdentity, hovered = null, pinned = null;
+  let base = { k: 1, ox: 0, oy: 0 }, w = 0, h = 0;
+  const MARGIN = 44, REAL_R = 7, BG_R = 3, HIT_REAL = 24, HIT_BG = 14;
+
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  // Colour follows the person (enrollment order). Beyond 8 people the palette would have to cycle,
+  // so those people fall back to neutral ink and are told apart by their name label.
+  const slotColor = (s) => (s != null && s < 8 ? css(`--c${s + 1}`) : css("--ink2"));
+  const pointColor = (p) => (p.real ? slotColor(p.slot) : css("--dot"));
+  const displayName = (p) => (p.real ? p.name : p.id.replace("aalto_", "aalto-"));
+
+  function el(tag, props = {}, ...children) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k === "class") e.className = v; else if (k === "style") e.style.cssText = v; else e[k] = v;
+    }
+    for (const c of children) e.append(c);
+    return e;
+  }
+
+  // ---------- geometry ----------
+  function fit() {
+    const r = canvas.getBoundingClientRect();
+    w = r.width; h = r.height;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    if (!points.length) return;
+    const xs = points.map((p) => p.x), ys = points.map((p) => p.y);
+    const [x0, x1] = [Math.min(...xs), Math.max(...xs)], [y0, y1] = [Math.min(...ys), Math.max(...ys)];
+    const k = Math.min((w - 2 * MARGIN) / (x1 - x0 || 1), (h - 2 * MARGIN) / (y1 - y0 || 1)); // one scale: never stretch the layout
+    base = { k, ox: w / 2 - k * (x0 + x1) / 2, oy: h / 2 + k * (y0 + y1) / 2 };
+  }
+  const baseXY = (p) => [base.ox + base.k * p.x, base.oy - base.k * p.y];
+  const screenXY = (p) => { const [bx, by] = baseXY(p); return [view.x + view.k * bx, view.y + view.k * by]; };
+
+  // ---------- drawing ----------
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const surface = css("--surface"), ink = css("--ink");
+    const xy = new Map(points.map((p) => [p.id, screenXY(p)]));
+    const active = hovered || pinned;
+
+    ctx.fillStyle = css("--dot");
+    for (const p of points) if (!p.real) {
+      const [x, y] = xy.get(p.id);
+      if (x < -8 || y < -8 || x > w + 8 || y > h + 8) continue;
+      ctx.beginPath(); ctx.arc(x, y, BG_R, 0, 6.2832); ctx.fill();
+    }
+
+    if (active) { // exact 128-D neighbours, drawn as hairlines
+      const [ax, ay] = xy.get(active.id);
+      ctx.save(); ctx.strokeStyle = ink; ctx.globalAlpha = 0.4; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      for (const n of active.neighbors) { const [nx, ny] = xy.get(n.id); ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(nx, ny); ctx.stroke(); }
+      ctx.restore();
+      ctx.save(); ctx.strokeStyle = ink; ctx.globalAlpha = 0.7; ctx.lineWidth = 1.5;
+      for (const n of active.neighbors) { const [nx, ny] = xy.get(n.id); ctx.beginPath(); ctx.arc(nx, ny, (n.real ? REAL_R : BG_R) + 3, 0, 6.2832); ctx.stroke(); }
+      ctx.restore();
+    }
+
+    const placed = [];
+    ctx.font = "600 12.5px ui-sans-serif, system-ui, sans-serif";
+    ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    for (const p of points) if (p.real) {
+      const [x, y] = xy.get(p.id);
+      if (active && active.id === p.id) { ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, REAL_R + 5, 0, 6.2832); ctx.stroke(); }
+      ctx.fillStyle = surface; ctx.beginPath(); ctx.arc(x, y, REAL_R + 2, 0, 6.2832); ctx.fill(); // 2px surface ring
+      ctx.fillStyle = pointColor(p); ctx.beginPath(); ctx.arc(x, y, REAL_R, 0, 6.2832); ctx.fill();
+
+      const tw = ctx.measureText(p.name).width, gap = REAL_R + (active && active.id === p.id ? 12 : 7); // clear the highlight ring
+      const spots = [[x + gap, y, "left"], [x - gap, y, "right"], [x, y - gap - 2, "center"], [x, y + gap + 2, "center"]];
+      const fits = (sx, sy, al) => {
+        const l = al === "left" ? sx : al === "right" ? sx - tw : sx - tw / 2;
+        const r = { l: l - 3, r: l + tw + 3, t: sy - 9, b: sy + 9 };
+        return r.l >= 4 && r.r <= w - 4 && r.t >= 4 && r.b <= h - 4 && !placed.some((q) => r.l < q.r && r.r > q.l && r.t < q.b && r.b > q.t) ? r : null;
+      };
+      let pick = null;
+      for (const s of spots) { const r = fits(...s); if (r) { pick = [s, r]; break; } }
+      if (!pick) pick = [spots[0], { l: spots[0][0], r: spots[0][0] + tw, t: y - 9, b: y + 9 }];
+      placed.push(pick[1]);
+      const [sx, sy, al] = pick[0];
+      ctx.textAlign = al;
+      ctx.lineWidth = 4; ctx.strokeStyle = surface; ctx.strokeText(p.name, sx, sy); // halo keeps the label legible over dots
+      ctx.fillStyle = ink; ctx.fillText(p.name, sx, sy);                            // text wears the text token, not the series colour
+    }
+
+    if (active && !active.real) { // hovered background dot: lift it
+      const [x, y] = xy.get(active.id);
+      ctx.fillStyle = surface; ctx.beginPath(); ctx.arc(x, y, BG_R + 3.5, 0, 6.2832); ctx.fill();
+      ctx.strokeStyle = ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, BG_R + 3.5, 0, 6.2832); ctx.stroke();
+      ctx.fillStyle = css("--ink2"); ctx.beginPath(); ctx.arc(x, y, BG_R + 1, 0, 6.2832); ctx.fill();
+    }
+  }
+
+  // ---------- hit testing: nearest dot, not dead-centre ----------
+  function hit(mx, my) {
+    let best = null, bd = Infinity;
+    for (const p of points) if (p.real) {
+      const [x, y] = screenXY(p), d = Math.hypot(x - mx, y - my);
+      if (d < HIT_REAL && d < bd) { best = p; bd = d; }
+    }
+    if (best) return best;
+    for (const p of points) if (!p.real) {
+      const [x, y] = screenXY(p), d = Math.hypot(x - mx, y - my);
+      if (d < HIT_BG && d < bd) { best = p; bd = d; }
+    }
+    return best;
+  }
+
+  // ---------- inspector ----------
+  function renderInspector() {
+    const p = hovered || pinned;
+    inspector.replaceChildren();
+    if (!p) {
+      inspector.append(el("p", { class: "empty", textContent: "Hover a dot to see its vector. Click one to keep it in view." }));
+      return;
+    }
+    inspector.append(
+      el("div", { class: "who" },
+        el("span", { class: "swatch", style: `background:${pointColor(p)}` }),
+        el("h2", { textContent: displayName(p) })),
+      el("p", { class: "meta", textContent: p.real ? `Enrolled ${p.enrolled_at.slice(0, 16).replace("T", " ")} UTC` : "Held-out Aalto subject" }));
+
+    inspector.append(el("h3", { textContent: "Nearest in 128-D" }));
+    const nn = el("div", { class: "nn" });
+    for (const n of p.neighbors) nn.append(el("span", { class: "nm", textContent: displayName(n) }), el("span", { class: "val mono", textContent: n.cosine.toFixed(3) }));
+    inspector.append(nn);
+
+    inspector.append(el("h3", { textContent: `Vector · 128 numbers · length ${p.norm.toFixed(3)}` }));
+    const vmax = Math.max(...p.vector.map(Math.abs)) || 1;
+    const grid = el("div", { class: "vec mono" });
+    for (const v of p.vector) {
+      const c = v >= 0 ? "--pos" : "--neg";
+      grid.append(el("span", { textContent: v.toFixed(3), style: `background: color-mix(in srgb, var(${c}) ${Math.round(45 * Math.abs(v) / vmax)}%, transparent)` }));
+    }
+    const copy = el("button", { class: "btn", type: "button", textContent: "Copy vector" });
+    copy.onclick = () => { navigator.clipboard.writeText(JSON.stringify(p.vector)); copy.textContent = "Copied"; setTimeout(() => (copy.textContent = "Copy vector"), 1200); };
+    inspector.append(grid, el("div", { class: "vecfoot" },
+      el("span", { class: "scale" }, el("i", { style: "background: var(--neg); opacity:.55" }), "negative", el("i", { style: "background: var(--pos); opacity:.55" }), "positive"),
+      copy));
+  }
+
+  // ---------- legend, table ----------
+  function renderLegend() {
+    legend.replaceChildren(el("span", { class: "label", textContent: "People" }));
+    const real = points.filter((p) => p.real);
+    for (const p of real) {
+      const chip = el("button", { class: "chip", type: "button", ariaPressed: String(pinned === p) },
+        el("span", { class: "swatch", style: `background:${pointColor(p)}` }), p.name);
+      chip.setAttribute("aria-pressed", String(pinned === p));
+      chip.onmouseenter = chip.onfocus = () => { hovered = p; draw(); renderInspector(); };
+      chip.onmouseleave = chip.onblur = () => { hovered = null; draw(); renderInspector(); };
+      chip.onclick = () => { pinned = p; focusOn(p); renderLegend(); renderInspector(); };
+      legend.append(chip);
+    }
+    if (!real.length) legend.append(el("span", { class: "empty", textContent: "No one enrolled yet. Enroll on the app's Enroll tab, then press Refresh." }));
+    const bg = points.length - real.length;
+    if (bg) legend.append(el("span", { class: "chip static" }, el("span", { class: "swatch", style: "background: var(--dot)" }), `Aalto background · ${bg}`));
+  }
+
+  function renderTable() {
+    const table = document.getElementById("table");
+    const head = el("tr");
+    for (const t of ["Person", "Type", "Nearest in 128-D", "Cosine", "x", "y"]) head.append(el("th", { textContent: t }));
+    table.replaceChildren(el("thead", {}, head));
+    const body = el("tbody");
+    for (const p of [...points].sort((a, b) => Number(b.real) - Number(a.real))) {
+      const n = p.neighbors[0], tr = el("tr");
+      tr.append(el("td", { textContent: displayName(p) }), el("td", { textContent: p.real ? "enrolled" : "background" }),
+        el("td", { textContent: n ? displayName(n) : "" }), el("td", { class: "num mono", textContent: n ? n.cosine.toFixed(3) : "" }),
+        el("td", { class: "num mono", textContent: p.x.toFixed(2) }), el("td", { class: "num mono", textContent: p.y.toFixed(2) }));
+      body.append(tr);
+    }
+    table.append(body);
+  }
+
+  // ---------- interaction ----------
+  const zoom = d3.zoom().scaleExtent([1, 60]).on("zoom", (e) => { view = e.transform; draw(); });
+  d3.select(canvas).call(zoom).on("dblclick.zoom", null);
+
+  function focusOn(p) {
+    const [bx, by] = baseXY(p), k = Math.max(view.k, 4);
+    d3.select(canvas).transition().duration(450).call(zoom.transform, d3.zoomIdentity.translate(w / 2 - k * bx, h / 2 - k * by).scale(k));
+  }
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (e.buttons) return; // dragging
+    const r = canvas.getBoundingClientRect(), p = hit(e.clientX - r.left, e.clientY - r.top);
+    canvas.classList.toggle("hit", !!p);
+    if (p !== hovered) { hovered = p; draw(); renderInspector(); }
+  });
+  canvas.addEventListener("pointerleave", () => { if (hovered) { hovered = null; draw(); renderInspector(); } });
+  canvas.addEventListener("click", (e) => {
+    const r = canvas.getBoundingClientRect(), p = hit(e.clientX - r.left, e.clientY - r.top);
+    pinned = p === pinned ? null : p; if (p) hovered = p; // touch has no hover: a tap pins and shows
+    renderLegend(); draw(); renderInspector();
+  });
+  document.getElementById("refresh").onclick = load;
+  document.getElementById("tableview").addEventListener("toggle", (e) => { if (e.target.open) renderTable(); });
+  new ResizeObserver(() => { fit(); draw(); }).observe(canvas);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderLegend(); draw(); renderInspector(); });
+
+  // ---------- data ----------
+  async function load() {
+    overlay.classList.remove("hidden");
+    try {
+      const res = await fetch("map/points");
+      if (!res.ok) throw new Error(res.status);
+      const data = await res.json();
+      points = data.points; method = data.method; byId = new Map(points.map((p) => [p.id, p]));
+      pinned = hovered = null;
+      const sel = new URLSearchParams(location.search).get("select");
+      if (sel && byId.has(sel)) pinned = byId.get(sel);
+      document.getElementById("sub").textContent =
+        `Each dot is one person's stored 128-number profile, flattened to two dimensions with ${method}. Grey dots are held-out Aalto people; coloured dots are people enrolled here.`;
+      fit(); renderLegend(); renderInspector(); draw();
+      overlay.classList.add("hidden");
+      if (!points.length) { overlay.classList.remove("hidden"); overlay.textContent = "The gallery is empty."; }
+    } catch (err) {
+      overlay.classList.remove("hidden"); overlay.textContent = `Could not load the map (${err.message}). Is the backend running?`;
+    }
+  }
+  load();
+})();
+</script>
+</body>
+</html>
