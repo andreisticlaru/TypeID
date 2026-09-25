@@ -190,6 +190,9 @@ export default function App() {
   const [matches, setMatches] = useState(null);
   const [pendingDiscard, setPendingDiscard] = useState(null); // { run } — awaiting confirmation
   const [collision, setCollision] = useState(null); // { sessions } — name already enrolled
+  const [people, setPeople] = useState([]); // enrolled people you can claim to be
+  const [claimId, setClaimId] = useState(""); // the identity being claimed in authenticate mode
+  const [auth, setAuth] = useState(null); // AuthenticateResponse
 
   const [sentence, setSentence] = useState("");
   const [progressText, setProgressText] = useState("0 keystrokes");
@@ -201,8 +204,10 @@ export default function App() {
   const [dwellValues, setDwellValues] = useState([]);
   const [rawText, setRawText] = useState("");
 
-  // The typing box only exists once we know whose typing it is (enroll) or who to look up (identify).
-  const capturing = mode === "identify" || (nameLocked && !enrolled);
+  // The typing box only exists once we know whose typing it is: the enrolling person, the
+  // identify query, or — for authenticate — the identity being claimed.
+  const capturing =
+    mode === "identify" || (mode === "authenticate" && !!claimId) || (nameLocked && !enrolled);
 
   function resetCapture() {
     eventsRef.current = [];
@@ -254,9 +259,24 @@ export default function App() {
     guardDiscard(() => {
       setMode(next);
       setMatches(null);
+      setAuth(null);
+      setClaimId("");
       resetEnrollment();
       if (next === "identify") newSentence(false);
+      if (next === "authenticate") {
+        fetch(`${API}/people`)
+          .then((r) => r.json())
+          .then(setPeople)
+          .catch(() => setStatus({ kind: "error", text: "Couldn't load the enrolled people." }));
+      }
     });
+  }
+
+  function claim(personId) {
+    setClaimId(personId);
+    setAuth(null);
+    setStatus(null);
+    if (personId) newSentence(false);
   }
 
   function onKeyDown(e) {
@@ -350,6 +370,18 @@ export default function App() {
         return;
       }
       await sendEnrollment(sessions, false);
+    } else if (mode === "authenticate") {
+      inputRef.current?.blur();
+      renderResults();
+      setBusy(true);
+      try {
+        setAuth(await postJson("/authenticate", { person_id: claimId, sentence, events }));
+        setStatus(null);
+      } catch (err) {
+        setStatus({ kind: "error", text: err.message });
+      } finally {
+        setBusy(false);
+      }
     } else {
       inputRef.current?.blur();
       renderResults();
@@ -402,8 +434,8 @@ export default function App() {
       </header>
 
       <main className="w-full max-w-[560px] bg-[var(--color-card)] rounded-3xl shadow-[var(--shadow-card)] border border-[var(--color-border)] p-6 sm:p-10">
-        <div className="flex gap-2 mb-7">
-          {["enroll", "identify"].map((m) => (
+        <div className="flex flex-wrap gap-2 mb-7">
+          {["enroll", "identify", "authenticate"].map((m) => (
             <button
               key={m}
               onClick={() => switchMode(m)}
@@ -452,6 +484,51 @@ export default function App() {
           </>
         )}
 
+        {mode === "authenticate" && (
+          <>
+            <p className="m-0 mb-6 text-[15px] leading-relaxed text-[var(--color-text-secondary)]">
+              Verification is a yes/no question, not a search: claim an identity, type the sentence,
+              and TypeID compares your rhythm against that one person's stored profile.
+            </p>
+            {/* Real radios behind styled labels: a native select popup is drawn by the OS, which
+                ignores this palette and rendered light text on a white list. This keeps the
+                arrow-key behaviour and semantics a pick-one control should have. */}
+            <fieldset className="m-0 p-0 border-0 mb-7">
+              <legend className="mb-3 p-0 text-[13px] font-medium text-[var(--color-text-secondary)]">
+                Who do you claim to be?
+              </legend>
+              {people.length === 0 ? (
+                <p className="m-0 text-[14px] text-[var(--color-text-secondary)]">
+                  Nobody is enrolled yet — enroll someone first, then come back to verify them.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {people.map((p) => (
+                    <label
+                      key={p.person_id}
+                      className={`cursor-pointer rounded-full px-4 py-2.5 text-[15px] font-medium border transition-colors duration-150 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-[var(--color-accent)] ${
+                        claimId === p.person_id
+                          ? "border-transparent bg-[var(--color-accent)] text-[var(--color-card)]"
+                          : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:border-[var(--color-accent-deep)]"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="claim"
+                        value={p.person_id}
+                        checked={claimId === p.person_id}
+                        onChange={() => claim(p.person_id)}
+                        className="sr-only"
+                      />
+                      {p.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </fieldset>
+          </>
+        )}
+
         {mode === "enroll" && nameLocked && !enrolled && (
           <div className="mb-7 flex items-center justify-between gap-4">
             <div className="min-w-0">
@@ -491,6 +568,15 @@ export default function App() {
             {mode === "identify" && (
               <p className="m-0 mb-6 text-[15px] leading-relaxed text-[var(--color-text-secondary)]">
                 Type the sentence below and TypeID will rank it against everyone enrolled.
+              </p>
+            )}
+            {mode === "authenticate" && (
+              <p className="m-0 mb-6 text-[15px] leading-relaxed text-[var(--color-text-secondary)]">
+                Claiming to be{" "}
+                <span className="font-semibold text-[var(--color-text)]">
+                  {people.find((p) => p.person_id === claimId)?.name ?? claimId}
+                </span>
+                . Type the sentence below to prove it.
               </p>
             )}
 
@@ -534,12 +620,16 @@ export default function App() {
                 {busy
                   ? mode === "identify"
                     ? "Comparing against the gallery…"
-                    : "Building your profile…"
+                    : mode === "authenticate"
+                      ? "Checking against the claim…"
+                      : "Building your profile…"
                   : mode === "identify"
                     ? "Identify me"
-                    : lastEnrollSentence
-                      ? "Finish enrollment"
-                      : "Next sentence"}
+                    : mode === "authenticate"
+                      ? "Verify me"
+                      : lastEnrollSentence
+                        ? "Finish enrollment"
+                        : "Next sentence"}
               </span>
             </button>
           </>
@@ -629,6 +719,52 @@ export default function App() {
           </div>
         )}
 
+        {mode === "authenticate" && auth && (
+          <div className="mt-7 animate-[rise_380ms_cubic-bezier(0.16,1,0.3,1)]">
+            <div
+              className="flex items-start gap-3"
+              style={{ color: auth.accepted ? "var(--color-accent)" : "var(--color-danger)" }}
+            >
+              <Icon path={auth.accepted ? icons.check : icons.declined} size={22} className="mt-1 shrink-0" />
+              <div className="min-w-0">
+                <h2 className="m-0 font-display text-[22px] font-semibold tracking-tight">
+                  {auth.accepted ? `Verified as ${auth.name}` : "Not verified"}
+                </h2>
+                <p className="m-0 mt-1.5 text-[14.5px] leading-snug text-[var(--color-text-secondary)]">
+                  {auth.accepted
+                    ? `This typing rhythm matches ${auth.name}'s stored profile closely enough to accept.`
+                    : `This typing rhythm isn't close enough to ${auth.name}'s stored profile to accept the claim.`}
+                </p>
+              </div>
+            </div>
+
+            {/* The decision is one number against one line — show both rather than just the verdict. */}
+            <div className="mt-5">
+              <div className="flex items-baseline justify-between text-[12.5px] tabular-nums text-[var(--color-text-secondary)]">
+                <span>similarity {auth.similarity.toFixed(3)}</span>
+                <span>
+                  threshold {auth.threshold.toFixed(2)} · {auth.operating_point}
+                </span>
+              </div>
+              <div className="relative mt-1.5 h-2 rounded-full bg-[var(--color-surface)] overflow-hidden">
+                <div
+                  className="h-full rounded-full origin-left animate-[sweep_620ms_cubic-bezier(0.16,1,0.3,1)]"
+                  style={{
+                    width: `${Math.max(auth.similarity, 0) * 100}%`,
+                    background: auth.accepted ? "var(--color-accent)" : "var(--color-danger)",
+                  }}
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute top-0 h-full w-0.5 bg-[var(--color-card)]"
+                  style={{ left: `${auth.threshold * 100}%` }}
+                />
+              </div>
+            </div>
+
+          </div>
+        )}
+
         {enrolled && (
           <button onClick={resetEnrollment} className={`mt-6 ${ghostButton}`}>
             Enroll another person
@@ -636,7 +772,7 @@ export default function App() {
         )}
 
         <section
-          className={`${mode === "identify" && showResults ? "" : "hidden "}mt-9 pt-8 border-t border-[var(--color-border)]`}
+          className={`${mode !== "enroll" && showResults ? "" : "hidden "}mt-9 pt-8 border-t border-[var(--color-border)]`}
         >
           <h2 className="m-0 mb-5 font-display text-[17px] font-semibold tracking-tight">What was measured</h2>
 
@@ -692,6 +828,7 @@ export default function App() {
           <button
             onClick={() => {
               setMatches(null);
+              setAuth(null);
               setStatus(null);
               newSentence(false);
             }}

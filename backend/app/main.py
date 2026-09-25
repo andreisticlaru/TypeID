@@ -19,7 +19,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .gallery import init_db
-from .routers import enroll, identify, map as map_router
+from .routers import authenticate, enroll, identify, map as map_router
 
 
 @asynccontextmanager
@@ -46,6 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(authenticate.router)
 app.include_router(enroll.router)
 app.include_router(identify.router)
 app.include_router(map_router.router)

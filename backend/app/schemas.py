@@ -1,4 +1,4 @@
-"""Pydantic request/response models for the /enroll and /identify endpoints."""
+"""Pydantic request/response models for the /enroll, /identify and /authenticate endpoints."""
 
 from typing import Literal
 
@@ -46,3 +46,23 @@ class IdentifyResponse(BaseModel):
     results: list[IdentifyResult]
     matched: bool
     min_confidence: float  # the decision threshold, so the UI never hardcodes its own copy
+
+
+class Person(BaseModel):
+    person_id: str
+    name: str
+
+
+class AuthenticateRequest(BaseModel):
+    person_id: str  # the identity being CLAIMED; verification is 1:1, not a search
+    sentence: str
+    events: list[KeystrokeEvent]
+
+
+class AuthenticateResponse(BaseModel):
+    person_id: str
+    name: str
+    accepted: bool
+    similarity: float
+    threshold: float
+    operating_point: str  # which calibrated point the threshold came from
