@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from features.extract import extract_features
 
 from ..embedding import embed
-from ..gallery import add_entry
+from ..gallery import add_entry, entry_exists
 from ..schemas import EnrollRequest, EnrollResponse
 
 router = APIRouter()
@@ -14,6 +14,11 @@ router = APIRouter()
 
 @router.post("/enroll", response_model=EnrollResponse)
 def enroll(request: EnrollRequest) -> EnrollResponse:
+    # A second "Alex" would otherwise silently overwrite the first Alex's template and report
+    # success. Refuse unless the caller says outright that replacing is what they meant.
+    if not request.replace and entry_exists(request.person_id):
+        raise HTTPException(status_code=409, detail=f"{request.name} is already enrolled.")
+
     try:
         embeddings = []
         for session in request.sessions:

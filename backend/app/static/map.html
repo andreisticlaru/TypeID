@@ -5,34 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TypeID Embedding Map</title>
 <style>
+  /* Same committed ink world as the capture UI (frontend/src/style.css), so the two
+     surfaces read as one product. --c1..--c8 stay categorical: they encode identity. */
   :root {
-    color-scheme: light;
-    --page: #f9f9f7; --surface: #fcfcfb; --wash: #f0efec;
-    --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
-    --border: rgba(11,11,11,0.10); --dot: rgba(137,135,129,0.55);
-    --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100;
-    --c5: #e87ba4; --c6: #008300; --c7: #4a3aa7; --c8: #e34948;
-    --pos: #2a78d6; --neg: #e34948;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:where(:not([data-theme="light"])) {
-      color-scheme: dark;
-      --page: #0d0d0d; --surface: #1a1a19; --wash: #262624;
-      --ink: #ffffff; --ink2: #c3c2b7; --muted: #898781;
-      --border: rgba(255,255,255,0.10); --dot: rgba(137,135,129,0.5);
-      --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500;
-      --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767;
-      --pos: #3987e5; --neg: #e66767;
-    }
-  }
-  :root[data-theme="dark"] {
     color-scheme: dark;
-    --page: #0d0d0d; --surface: #1a1a19; --wash: #262624;
-    --ink: #ffffff; --ink2: #c3c2b7; --muted: #898781;
-    --border: rgba(255,255,255,0.10); --dot: rgba(137,135,129,0.5);
-    --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500;
-    --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767;
-    --pos: #3987e5; --neg: #e66767;
+    --page: #0d0b18; --surface: #161328; --wash: #211d3b;
+    --ink: #f4f3f8; --ink2: #a8a5be; --muted: #8a86a3;
+    --border: #2b2745; --dot: rgba(168,165,190,0.5);
+    --c1: #5dcaa5; --c2: #d95926; --c3: #199e70; --c4: #c98500;
+    --c5: #d55181; --c6: #3987e5; --c7: #9085e9; --c8: #e66767;
+    --pos: #5dcaa5; --neg: #e66767;
   }
 
   * { box-sizing: border-box; }
@@ -142,8 +124,6 @@
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <script>
 (() => {
-  const themeParam = new URLSearchParams(location.search).get("theme"); // ?theme=dark|light overrides the OS setting
-  if (themeParam === "dark" || themeParam === "light") document.documentElement.dataset.theme = themeParam;
   const dpr = window.devicePixelRatio || 1;
   const canvas = document.getElementById("map");
   const ctx = canvas.getContext("2d");

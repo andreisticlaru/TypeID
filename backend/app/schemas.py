@@ -21,6 +21,7 @@ class EnrollRequest(BaseModel):
     person_id: str
     name: str
     sessions: list[Session]  # 2-3 transcribed prompts, per CLAUDE.md enrollment flow
+    replace: bool = False  # overwriting someone's template has to be asked for, never implied
 
 
 class EnrollResponse(BaseModel):
@@ -44,3 +45,4 @@ class IdentifyResult(BaseModel):
 class IdentifyResponse(BaseModel):
     results: list[IdentifyResult]
     matched: bool
+    min_confidence: float  # the decision threshold, so the UI never hardcodes its own copy

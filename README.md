@@ -62,13 +62,12 @@ Reproduce with `python -m eval.rank_n --seeds 0 1 2 3 4 5 6 7 8 9` (add `--enrol
 
 ## Why This Framing Matters
 
-Keystroke biometrics is not a solved problem—particularly the generalization gap between transcription (controlled, read-then-copy) and free composition (spontaneous, think-then-type). This project validates the **embedding + ranking architecture** on a transcription proxy task. It's a real improvement over fixed-password datasets (forces generalization to unseen text, avoids memorizing one password's motor pattern) but carries a known domain gap against composed text. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full technical design, [FUTURE_PROSPECTS.md](FUTURE_PROSPECTS.md) for next steps (composition capture, cross-device evaluation), and [CLAUDE.md](CLAUDE.md) for how to contribute.
+Keystroke biometrics is not a solved problem—particularly the generalization gap between transcription (controlled, read-then-copy) and free composition (spontaneous, think-then-type). This project validates the **embedding + ranking architecture** on a transcription proxy task. It's a real improvement over fixed-password datasets (forces generalization to unseen text, avoids memorizing one password's motor pattern) but carries a known domain gap against composed text. Composition capture and cross-device evaluation are the natural next steps. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full technical design and [CLAUDE.md](CLAUDE.md) for how to contribute.
 
 ## Try it out
 
-The demo currently only shows the **capture UI** (type a prompt, see your dwell/flight-time
-rhythm) — enrollment and identification against a live gallery aren't wired up yet (see
-[Current state](#current-state-vs-target) below).
+Enroll, then identify against the live gallery — from a phone or a second device works too, as
+long as it can reach the backend on your local network.
 
 **Backend** (FastAPI, from `backend/`):
 ```
@@ -92,17 +91,18 @@ Serves on `http://localhost:5173`, CORS-allowed against the backend above.
 |---|---|---|
 | Feature extraction (`features/extract.py`) | Canonical HL/IL/PL/RL timing-vector extractor, shared byte-for-byte by training and live capture | **Done** — single implementation used by both paths, 12 unit tests, 25-keystroke floor enforced per window |
 | Model (`/model`) | 2-layer LSTM triplet-loss embedding network, trained on Aalto | **Done** — 217k-parameter encoder trained 500k steps with hard negative mining; 56.9% Rank-1 on held-out subjects (see [Results](#results)) |
-| Embedding function (`backend/app/embedding.py`) | Frozen `f(features) -> 128-dim embedding` | Stub — raises `NotImplementedError`; weights now exist, so this is the next piece of work |
+| Embedding function (`backend/app/embedding.py`) | Frozen `f(features) -> 128-dim embedding` | **Done** — loads the trained checkpoint, pools multi-window sessions, re-normalizes |
 | Gallery store (`backend/app/gallery.py`) | SQLite table of `{person_id, name, embedding, enrolled_at}` | **Done** — implemented and working |
-| `/enroll`, `/identify` endpoints | Full extract → embed → pool/rank flow | Routing, schemas, pooling, and ranking logic are fully written and correct, but unreachable — both endpoints return `501` until extraction/embedding are implemented |
-| Frontend capture UI | Prompt display, capture, submit to backend, render top-5 results | Prompt display + capture + client-side rhythm visualization work; **not yet wired to the backend** (enroll/identify calls are a TODO) |
+| `/enroll`, `/identify` endpoints | Full extract → embed → pool/rank flow | **Done** — both reachable and wired to the trained model |
+| Embedding map (`GET /map`) | Interactive view of the gallery embedding space | **Done** — seeded Aalto background plus enrolled points |
+| Frontend capture UI | Prompt display, capture, submit to backend, render top-5 results | **Done** — enroll and identify flows are wired to the backend, reachable from a phone |
 | Evaluation (`/eval`) | CMC curve, Rank-N accuracy | **Done** — multi-seed Rank-N/CMC over held-out subjects, plus an HTML progress dashboard |
 | Data (`/data`) | Cached preprocessed Aalto sequences | **Done** — 2.48M windows from 168,593 participants, cached as `.npy`; subject-disjoint split saved to `split.json` |
 
-In short: the **ML core now works end to end** — canonical feature extraction, a trained
-embedding model, and a held-out evaluation that says how well it performs. The remaining gap is
-the **join between the two halves**: `embedding.py` still needs to load the trained weights, which
-is what unblocks `/enroll` and `/identify` and, in turn, the frontend wiring.
+In short: the **system works end to end** — canonical feature extraction, a trained embedding
+model, a live gallery reachable through `/enroll` and `/identify`, and a held-out evaluation that
+says how well it performs. The open questions from here are free-text composition, explainability,
+and data protection.
 
 ## How It Works
 
@@ -124,8 +124,8 @@ is what unblocks `/enroll` and `/identify` and, in turn, the frontend wiring.
 /features/    canonical feature-extraction module + unit tests
 /model/       LSTM encoder, triplet loss, triplet sampler, training script (weights gitignored)
 /eval/        Rank-N / CMC evaluation, progress dashboard
-/backend/     FastAPI app: gallery store (done), /enroll + /identify (wired, blocked on model)
-/frontend/    Vite + Tailwind capture UI (working, not yet wired to backend)
+/backend/     FastAPI app: gallery store, /enroll, /identify, /map — all wired to the trained model
+/frontend/    Vite + Tailwind capture UI, wired to the backend for enroll/identify
 
 ARCHITECTURE.md  Full technical design: data specs, model, evaluation metrics
 CLAUDE.md        Contribution guidelines and working conventions

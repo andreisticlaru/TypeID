@@ -26,7 +26,7 @@ This is a personal CV/portfolio project, built out of genuine interest in AI/ML,
 
 An open-set 1:N gallery search system for keystroke biometrics. A network maps keystroke sequences to embeddings; the same person's typing clusters close, different people spread apart. New identities enroll later without retraining—enrollment and query are forward pass + ranking only.
 
-Capture protocol: random-prompt transcription (read-then-copy sentences), not free composition. This is a proxy task; see [FUTURE_PROSPECTS.md](FUTURE_PROSPECTS.md) for limitations and next steps.
+Capture protocol: random-prompt transcription (read-then-copy sentences), not free composition. This is a proxy task, with a known domain gap against freely composed text.
 
 ## The Critical Invariant
 

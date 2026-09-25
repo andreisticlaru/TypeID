@@ -13,7 +13,7 @@ Once trained, the encoder is **frozen**—no further learning happens at enrollm
 
 This is what makes it open-set: adding a new enrolled person is just one forward pass, never a retrain.
 
-**Caveat worth remembering:** transcription is itself a proxy for real forensic use, where the text of interest is usually freely composed, not copied from a prompt. Training and this project's own capture protocol match each other (both transcription)—the open domain-gap question is whether a model trained this way generalizes to free composition. See [FUTURE_PROSPECTS.md](FUTURE_PROSPECTS.md) for that discussion.
+**Caveat worth remembering:** transcription is itself a proxy for real forensic use, where the text of interest is usually freely composed, not copied from a prompt. Training and this project's own capture protocol match each other (both transcription)—the open domain-gap question is whether a model trained this way generalizes to free composition.
 
 ## 1:N Gallery Search, Not Classification
 

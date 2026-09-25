@@ -75,4 +75,4 @@ def identify(request: IdentifyRequest) -> IdentifyResponse:
     gallery = get_all_entries()
     results, matched = rank_gallery(query_embedding, gallery)
 
-    return IdentifyResponse(results=results, matched=matched)
+    return IdentifyResponse(results=results, matched=matched, min_confidence=MIN_CONFIDENCE)

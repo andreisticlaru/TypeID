@@ -33,6 +33,12 @@ def init_db() -> None:
         conn.commit()
 
 
+def entry_exists(person_id: str) -> bool:
+    """Whether this person_id is already enrolled. Enrolling over one destroys a template."""
+    with _connect() as conn:
+        return conn.execute("SELECT 1 FROM gallery WHERE person_id = ?", (person_id,)).fetchone() is not None
+
+
 def add_entry(person_id: str, name: str, embedding: list[float]) -> dict:
     """Insert (or replace) a gallery entry and return the stored record."""
     enrolled_at = datetime.now(timezone.utc).isoformat()

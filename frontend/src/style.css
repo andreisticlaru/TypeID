@@ -1,32 +1,121 @@
 @import "tailwindcss";
 
+/* Palette sampled from the brand mark (image.png): ink #161328, emerald #1D9E75, mint #5DCAA5.
+   One committed world, not a light/dark fork — the mark is dark, and a scanner reads right in ink. */
 :root {
-  --color-bg: #f5f5f7;
-  --color-card: #ffffff;
-  --color-text: #1d1d1f;
-  --color-text-secondary: #86868b;
-  --color-accent: #0071e3;
-  --color-border: #d2d2d7;
-  --shadow-card: 0 20px 60px rgba(0, 0, 0, 0.08);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #000000;
-    --color-card: #1c1c1e;
-    --color-text: #f5f5f7;
-    --color-text-secondary: #98989d;
-    --color-accent: #2997ff;
-    --color-border: #38383a;
-    --shadow-card: 0 20px 60px rgba(0, 0, 0, 0.4);
-  }
+  --color-bg: #0d0b18;
+  --color-card: #161328;
+  --color-surface: #211d3b; /* raised chips and pills inside the card */
+  --color-text: #f4f3f8;
+  --color-text-secondary: #a8a5be; /* 7.6:1 on the card — placeholder and label safe */
+  --color-accent: #5dcaa5;
+  --color-accent-deep: #1d9e75;
+  --color-danger: #ff7a6b;
+  --color-caution: #e8b667; /* "declined to guess" is a correct outcome, not an error */
+  --color-border: #2b2745;
+  --shadow-card: 0 24px 70px rgba(0, 0, 0, 0.55);
 }
 
 @theme {
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
+  --font-display: "Space Grotesk", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+html {
+  color-scheme: dark; /* browser chrome (scrollbars, form controls) joins the world */
 }
 
 body {
   -webkit-font-smoothing: antialiased;
+}
+
+/* Surfaces the browser draws for us still belong to the design. */
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 32%, transparent);
+  color: var(--color-text);
+}
+
+/* No border-radius here: it overrode the pills' rounded-full and snapped them to a rectangle
+   whenever they took focus. Tailwind's `transition` utility animates outline-color, so the ring
+   fades in from currentColor — expected, not a missing ring. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* Underline fields carry their own focus indicator; a ring around them reads as a browser
+   artifact on a borderless box. Doubling the rule keeps focus obvious without shifting layout. */
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-bottom-color: var(--color-accent);
+  box-shadow: 0 1px 0 0 var(--color-accent);
+}
+
+input,
+textarea {
+  caret-color: var(--color-accent);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent-deep);
+  background-clip: content-box;
+}
+
+/* The one authored moment: the mark's rings are a scan, so they scan while the model does. */
+@keyframes scan-cw {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes scan-ccw {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes sweep {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
