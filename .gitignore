@@ -1,5 +1,11 @@
 backend/.venv/
 backend/gallery.db
+
+# Private working docs — not published with the repo
+PRODUCT.md
+TODO.md
+FUTURE_PROSPECTS.md
+KNOWN_ISSUES.md
 __pycache__/
 *.pyc
 data/preprocessed/
