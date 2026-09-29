@@ -63,6 +63,24 @@ def add_entry(person_id: str, name: str, embedding: list[float]) -> dict:
     }
 
 
+def get_entry(person_id: str) -> dict | None:
+    """One gallery entry by id, or None. Verification compares against this one template."""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT person_id, name, embedding, enrolled_at FROM gallery WHERE person_id = ?",
+            (person_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    person_id, name, embedding, enrolled_at = row
+    return {
+        "person_id": person_id,
+        "name": name,
+        "embedding": json.loads(embedding),
+        "enrolled_at": enrolled_at,
+    }
+
+
 def get_all_entries() -> list[dict]:
     """Return every gallery entry with its embedding decoded back to a list of floats."""
     with _connect() as conn:
