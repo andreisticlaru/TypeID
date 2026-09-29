@@ -1,0 +1,73 @@
+{
+  "checkpoint": "typenet/checkpoints/typenet_a.pt",
+  "arch": "typenet",
+  "steps": 30000,
+  "batch_size": 512,
+  "triplets_seen": 15360000,
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "typenet_protocol": {
+    "metric": "mean pairwise Euclidean distance, raw embeddings",
+    "rank1": [
+      1.03,
+      0.295
+    ],
+    "rank5": [
+      2.45,
+      0.36
+    ],
+    "rank20": [
+      7.9,
+      0.422
+    ],
+    "eer_g1": [
+      36.779,
+      0.227
+    ],
+    "eer_g2": [
+      35.004,
+      0.441
+    ],
+    "eer_g5": [
+      33.042,
+      0.544
+    ],
+    "eer_g7": [
+      32.506,
+      0.274
+    ],
+    "eer_g10": [
+      31.808,
+      0.385
+    ]
+  },
+  "strict": {
+    "metric": "cosine on averaged profile (backend rule), 3 enroll + 1 query",
+    "rank1": [
+      1.99,
+      2.34
+    ],
+    "rank5": [
+      6.25,
+      0.445
+    ],
+    "rank10": [
+      7.34,
+      0.372
+    ],
+    "rank20": [
+      9.19,
+      0.681
+    ]
+  }
+}

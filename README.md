@@ -56,6 +56,26 @@ Those two columns sample 15 random sessions per person and pool every window of 
 
 The random-negative baseline lands on TypeNet's published one-sequence EER (5.43% vs 5.4%), which is the check that this evaluation is like-for-like; it sits below their Rank-1, consistent with this model not seeing the key code. Mining is what moves it past the paper. Caveats: TypeNet tests on 100,000 people and this test can only use the 3,771 held-out people with 15 sessions above the 25-keystroke floor, so its galleries overlap across draws; giving the hardest-negative model a gallery of all 3,771 lowers Rank-1 from 89.8% to 79.0%. The same model scores 90.2% on people it *trained* on, so there is no memorization gap. Averaging a person's enrollment embeddings into one profile beats averaging pairwise distances, which is what the backend's pooling does.
 
+**TypeNet retrained on this project's data.** The published comparison mixes architecture, recipe, subjects and TypeNet's key-code input. To separate them, TypeNet was rebuilt in PyTorch ([typenet/](typenet/)): two LSTM(128) layers with BatchNorm, dropout 0.5 and recurrent dropout 0.2 in between, squared-Euclidean triplet loss with margin 1.5, 512 triplets per batch and 30,000 steps (the paper's 200 × 150 batches). It was trained on the same split and windows as the model above, with **timing features only**. The parameter count matches the paper's 200,458 once its key-code input is removed. Same protocol and 10 draws as the table above ([comparison/evaluate.py](comparison/evaluate.py)):
+
+| Model | Triplets seen | Rank-1 (1,000 people) | EER at 1 / 5 / 10 |
+|---|---|---|---|
+| TypeNet, published (key code as input) | 15.4M | 67.4% | 5.4 / 2.2 / 1.6 |
+| TypeNet, paper recipe (Adam lr 0.05) | 15.4M | 1.0% (collapsed) | 36.8 / 33.0 / 31.8 |
+| TypeNet, lr 1e-3 | 15.4M | 68.3% | 6.78 / 3.08 / 2.28 |
+| TypeNet, lr 1e-3, semi-hard mining after 10k steps | 15.4M | 74.2% | 6.11 / 2.56 / 1.85 |
+| TypeNet, hardest-negative mining | 15.4M | 0.5% (collapsed) | 25.1 / 19.1 / 17.1 |
+| This project, random negatives (200k) | 12.8M | 60.5% | 5.43 / 2.57 / 2.01 |
+| This project, hardest-negative (500k) | 32.0M | 89.8% | 3.01 / 0.81 / 0.55 |
+
+What each row shows:
+- **The published learning rate doesn't transfer.** At lr 0.05 the loss spikes within 400 steps and the network settles on nearly identical embeddings for everyone. At lr 1e-3 the same network reaches the paper's Rank-1 (68.3% vs 67.4%) without the key code, though its EER stays about 1.3 points higher at one enrollment sequence.
+- **Architecture, same recipe.** With random negatives and similar compute (15.4M vs 12.8M triplets), TypeNet's architecture beats this project's (68.3% vs 60.5%).
+- **Mining helps TypeNet too, but less.** Semi-hard mining adds 6 points to TypeNet. Hardest-negative mining collapsed it twice, once started at 10k steps and once from the semi-hard model at 20k: the loss pinned at the margin and every input mapped to the same point.
+- **Why that collapse happens here and not in this project's model is untested.** Three candidates: unnormalized embeddings under squared Euclidean distance, where shrinking everything is an easy exit; the larger batch, whose hardest negative out of 1,024 is more often a near-duplicate typist; or starting too early.
+
+Each row is a single training seed, so gaps of a few points are not established.
+
 **How it got here.** Accuracy plateaued at 28% after roughly 90k steps of random negatives, and a diagnostic showed why: 78% of randomly drawn training triplets already satisfied the loss margin and contributed no gradient. Replacing each random negative with a harder one from the same batch raised Rank-1 to 51.7% (semi-hard), and taking the closest negative regardless (hardest) to 56.9% at equal compute. A control that simply trained 100k more steps with random negatives gained 0.8 points, so the improvement comes from which negatives are used, not from training longer. The hardest-negative curve is now flattening.
 
 **How many prompts to type.** The demo lets you enroll, identify and authenticate from 1, 5 or 10 prompts, so each combination needs its own decision threshold. `eval/calibrate_auth.py` sets **one threshold per combination, fixed in advance for everyone**, which is what a deployed system has to do. That is stricter than the per-person EER above, which picks the best threshold for each person after seeing their scores. That's why 5 enrollment prompts give 1.97% here but 0.81% there. Each cell is the equal error rate at the threshold the backend uses, over 1,000 held-out people:
@@ -157,6 +177,8 @@ and data protection.
 /features/    canonical feature-extraction module + unit tests
 /model/       LSTM encoder, triplet loss, triplet sampler, training script (weights gitignored)
 /eval/        Rank-N / CMC evaluation, progress dashboard
+/typenet/     TypeNet rebuilt in PyTorch (timing features only): network, loss + mining, training, tests
+/comparison/  evaluates checkpoints of any architecture under both protocols
 /backend/     FastAPI app: gallery store, /enroll, /identify, /map — all wired to the trained model
 /frontend/    Vite + Tailwind capture UI, wired to the backend for enroll/identify
 

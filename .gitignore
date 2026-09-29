@@ -11,4 +11,5 @@ __pycache__/
 data/preprocessed/
 .venv-model/
 model/*.pt
+typenet/checkpoints/
 backend/identify_log.jsonl

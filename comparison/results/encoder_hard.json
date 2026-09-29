@@ -1,0 +1,73 @@
+{
+  "checkpoint": "model/encoder_hard.pt",
+  "arch": "v1",
+  "steps": 500000,
+  "batch_size": 64,
+  "triplets_seen": 32000000,
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "typenet_protocol": {
+    "metric": "mean pairwise Euclidean distance, raw embeddings",
+    "rank1": [
+      89.78,
+      1.137
+    ],
+    "rank5": [
+      99.08,
+      0.169
+    ],
+    "rank20": [
+      99.81,
+      0.173
+    ],
+    "eer_g1": [
+      3.009,
+      0.128
+    ],
+    "eer_g2": [
+      1.531,
+      0.111
+    ],
+    "eer_g5": [
+      0.81,
+      0.094
+    ],
+    "eer_g7": [
+      0.66,
+      0.065
+    ],
+    "eer_g10": [
+      0.553,
+      0.061
+    ]
+  },
+  "strict": {
+    "metric": "cosine on averaged profile (backend rule), 3 enroll + 1 query",
+    "rank1": [
+      56.85,
+      1.714
+    ],
+    "rank5": [
+      84.58,
+      1.384
+    ],
+    "rank10": [
+      91.85,
+      0.717
+    ],
+    "rank20": [
+      96.07,
+      0.598
+    ]
+  }
+}
