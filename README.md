@@ -58,7 +58,40 @@ The random-negative baseline lands on TypeNet's published one-sequence EER (5.43
 
 **How it got here.** Accuracy plateaued at 28% after roughly 90k steps of random negatives, and a diagnostic showed why: 78% of randomly drawn training triplets already satisfied the loss margin and contributed no gradient. Replacing each random negative with a harder one from the same batch raised Rank-1 to 51.7% (semi-hard), and taking the closest negative regardless (hardest) to 56.9% at equal compute. A control that simply trained 100k more steps with random negatives gained 0.8 points, so the improvement comes from which negatives are used, not from training longer. The hardest-negative curve is now flattening.
 
-Reproduce with `python -m eval.rank_n --seeds 0 1 2 3 4 5 6 7 8 9` (add `--enroll-sessions 10 --probe-sessions 5 --score pairwise` for the random-session TypeNet-style variant, or run `python -m eval.typenet_protocol --checkpoint model/encoder_hard.pt --seeds 0 1 2 3 4 5 6 7 8 9` for the strict one), or open [`eval/dashboard.html`](eval/dashboard.html) for the full project timeline and per-checkpoint curves.
+**How many prompts to type.** The demo lets you enroll, identify and authenticate from 1, 5 or 10 prompts, so each combination needs its own decision threshold. `eval/calibrate_auth.py` sets **one threshold per combination, fixed in advance for everyone**, which is what a deployed system has to do. That is stricter than the per-person EER above, which picks the best threshold for each person after seeing their scores. That's why 5 enrollment prompts give 1.97% here but 0.81% there. Each cell is the equal error rate at the threshold the backend uses, over 1,000 held-out people:
+
+| Authentication, enroll ↓ / query → | 1 prompt | 5 prompts | 10 prompts |
+|---|---|---|---|
+| 1 prompt | 4.60% @ 0.370 | 2.09% @ 0.491 | 1.90% @ 0.506 |
+| **5 prompts** | **1.97% @ 0.497** | **0.29% @ 0.714** | 0.12% @ 0.768 |
+| 10 prompts | 1.80% @ 0.514 | 0.12% @ 0.761 | not measurable |
+
+| Identification, live gallery, queried with later sessions | 1 prompt | **5 prompts** | 10 prompts |
+|---|---|---|---|
+| Threshold | 0.75 | **0.81** | 0.82 |
+| Enrolled person named correctly | 51.7% | **88.3%** | 93.1% |
+| Enrolled person named as someone else | 10.7% | **4.7%** | 2.0% |
+| Someone not enrolled gets named | 21.8% | **18.7%** | 17.8% |
+| Correct person ranked first (no threshold) | 69.3% | **93.0%** | 97.1% |
+
+How the identification thresholds were chosen. Measured on the live gallery (500 Aalto people enrolled from their first 5 sessions) with enrolled people queried by *later* sessions, as real use always is, and 600 strangers who aren't enrolled. The first attempt capped strangers at 5% (0.816 / 0.858 / 0.865), which looked right on paper but failed a real user: their 5-prompt queries scored 0.81-0.94 against their own profile while the best Aalto competitor never passed 0.794, and 0.858 turned half of those correct top-ranked results into "no match". In this demo nearly everyone who identifies has just enrolled, so the thresholds now accept naming someone who isn't enrolled about one time in five, and a "no match" still shows the closest candidates. One prompt stays weak whatever the threshold: the same user's single-prompt scores (mean 0.69) and their best Aalto competitor's (mean 0.69) overlapped completely.
+
+| Real-user check (one person, browser capture, against a 5-prompt profile) | Old threshold | New threshold |
+|---|---|---|
+| 5-prompt attempts named correctly | 1 of 3 (0.858) | **3 of 3** (0.81) |
+| 1-prompt attempts: correct / wrong name / no match | 1 / 0 / 8 (0.816) | **3 / 1 / 5** (0.75) |
+| Their score vs best Aalto competitor, 5 prompts | 0.81-0.94 vs at most 0.794 | |
+| Their score vs best Aalto competitor, 1 prompt (mean) | 0.69 vs 0.69 | |
+
+This is one person's handful of attempts, not a benchmark: it shows where a real browser user's scores fall relative to the thresholds, which the Aalto-only calibration couldn't. Live identify scores keep accumulating in `backend/identify_log.jsonl` (names and similarities only; gitignored) for the next recalibration.
+
+**The best trade is 5 prompts to enroll and 5 to identify. Authentication needs 1 for a quick check, or 5 when it has to be strict.** Averaging n prompts cuts per-prompt noise by about √n, so 1 → 5 buys a 2.2× reduction and 5 → 10 only 1.4× more, for twice the typing. The tables show it. Enrolling from 10 instead of 5 barely moves single-prompt authentication (1.97% → 1.80%) because the noisy side is then the one-prompt query. A 5-prompt query cuts that error about sevenfold (0.29%). Identification is the case where one prompt is really weak: with 500 people in the gallery, a stranger's best match usually looks convincing, so one prompt finds an enrolled person about half the time, against 88% with five. Which side the typing is on barely matters (1 + 5 ≈ 5 + 1); the total does.
+
+The demo defaults to 5 / 1 / 1. Identify stays at 1 on purpose, for speed, and the page shows how often each choice finds an enrolled person beside the selector. For reference, TypeNet enrolls from 1–10 sequences and authenticates each decision on a single one, and identifies with 10 enrollment + 5 query sequences. The live gallery's 500 Aalto background people are each enrolled from their first 5 sessions, the same as the demo's default.
+
+Caveats: Aalto has at most 15 sessions per person, so 10 + 10 can't be measured without reusing enrollment sessions as queries; the backend borrows the 10 + 5 threshold and says so. The 0.12% cells rest on about 1,000 genuine scores, so they can't be told apart from 0.29% with confidence. The identification thresholds assume a gallery enrolled from 5 prompts, which the Aalto background makes true for most of it.
+
+Reproduce with `python -m eval.rank_n --seeds 0 1 2 3 4 5 6 7 8 9` (add `--enroll-sessions 10 --probe-sessions 5 --score pairwise` for the random-session TypeNet-style variant, or run `python -m eval.typenet_protocol --checkpoint model/encoder_hard.pt --seeds 0 1 2 3 4 5 6 7 8 9` for the strict one; `python -m eval.calibrate_auth --checkpoint model/encoder_hard.pt` for the prompt-count thresholds), or open [`eval/dashboard.html`](eval/dashboard.html) for the full project timeline and per-checkpoint curves.
 
 ## Why This Framing Matters
 
@@ -76,7 +109,7 @@ python -m venv .venv
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
-Serves on `http://127.0.0.1:8000`; `/health` should return `{"status": "ok"}`.
+Serves on `http://127.0.0.1:8000`; `/health` should return `{"status": "ok"}`. On first start it copies `gallery-populated.db` (500 held-out Aalto people, the background you're searched against) to `gallery.db`, which is gitignored: your enrollments stay local and the committed file never changes.
 
 **Frontend** (Vite, from `frontend/`):
 ```
@@ -92,7 +125,7 @@ Serves on `http://localhost:5173`, CORS-allowed against the backend above.
 | Feature extraction (`features/extract.py`) | Canonical HL/IL/PL/RL timing-vector extractor, shared byte-for-byte by training and live capture | **Done** — single implementation used by both paths, 12 unit tests, 25-keystroke floor enforced per window |
 | Model (`/model`) | 2-layer LSTM triplet-loss embedding network, trained on Aalto | **Done** — 217k-parameter encoder trained 500k steps with hard negative mining; 56.9% Rank-1 on held-out subjects (see [Results](#results)) |
 | Embedding function (`backend/app/embedding.py`) | Frozen `f(features) -> 128-dim embedding` | **Done** — loads the trained checkpoint, pools multi-window sessions, re-normalizes |
-| Gallery store (`backend/app/gallery.py`) | SQLite table of `{person_id, name, embedding, enrolled_at}` | **Done** — implemented and working |
+| Gallery store (`backend/app/gallery.py`) | SQLite table of `{person_id, name, embedding, enrolled_at}` | **Done** — also stores `enroll_prompts`, since thresholds depend on it |
 | `/enroll`, `/identify` endpoints | Full extract → embed → pool/rank flow | **Done** — both reachable and wired to the trained model |
 | Embedding map (`GET /map`) | Interactive view of the gallery embedding space | **Done** — seeded Aalto background plus enrolled points |
 | Frontend capture UI | Prompt display, capture, submit to backend, render top-5 results | **Done** — enroll and identify flows are wired to the backend, reachable from a phone |
@@ -112,7 +145,7 @@ and data protection.
 
 **Training → Enrollment → Identification:**
 1. Train the LSTM once on the [Aalto 136M Keystrokes dataset](https://userinterfaces.aalto.fi/136Mkeystrokes/) (public, 168,000 subjects, ~15 transcribed sentences each). Output: frozen embedding function `f()`.
-2. User enrolls: transcribes 2–3 random prompts. Backend extracts timing features, runs through `f()`, stores embedding + name in gallery.
+2. User enrolls: transcribes 1, 5 or 10 random prompts (default 5). Backend extracts timing features, runs each through `f()`, averages them into one profile, and stores it with the name and prompt count in the gallery.
 3. Unknown sample arrives. Extract timing, embed with `f()`, rank gallery by cosine similarity, return top-5 candidates.
 
 **Critical invariant:** `features/extract.py` is the single canonical feature extractor used by both training and live endpoints. Any divergence between training features and query features introduces silent bugs—a model trained on slightly-different features degrades without error. See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed feature and model specs.
