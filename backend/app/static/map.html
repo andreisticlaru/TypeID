@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TypeID Embedding Map</title>
+<!-- Relative, so it resolves both via the frontend's /api proxy and on the backend directly. -->
+<link rel="icon" type="image/png" href="map/mark.png">
 <style>
   /* Same committed ink world as the capture UI (frontend/src/style.css), so the two
      surfaces read as one product. --c1..--c8 stay categorical: they encode identity. */
@@ -142,6 +144,7 @@
   const slotColor = (s) => (s != null && s < 8 ? css(`--c${s + 1}`) : css("--ink2"));
   const pointColor = (p) => (p.real ? slotColor(p.slot) : css("--dot"));
   const displayName = (p) => (p.real ? p.name : p.id.replace("aalto_", "aalto-"));
+  const tagged = (p) => `[${p.enroll_prompts}] ${p.name}`; // prompts pooled into the template
 
   function el(tag, props = {}, ...children) {
     const e = document.createElement(tag);
@@ -200,7 +203,7 @@
       ctx.fillStyle = surface; ctx.beginPath(); ctx.arc(x, y, REAL_R + 2, 0, 6.2832); ctx.fill(); // 2px surface ring
       ctx.fillStyle = pointColor(p); ctx.beginPath(); ctx.arc(x, y, REAL_R, 0, 6.2832); ctx.fill();
 
-      const tw = ctx.measureText(p.name).width, gap = REAL_R + (active && active.id === p.id ? 12 : 7); // clear the highlight ring
+      const label = tagged(p), tw = ctx.measureText(label).width, gap = REAL_R + (active && active.id === p.id ? 12 : 7); // clear the highlight ring
       const spots = [[x + gap, y, "left"], [x - gap, y, "right"], [x, y - gap - 2, "center"], [x, y + gap + 2, "center"]];
       const fits = (sx, sy, al) => {
         const l = al === "left" ? sx : al === "right" ? sx - tw : sx - tw / 2;
@@ -213,8 +216,8 @@
       placed.push(pick[1]);
       const [sx, sy, al] = pick[0];
       ctx.textAlign = al;
-      ctx.lineWidth = 4; ctx.strokeStyle = surface; ctx.strokeText(p.name, sx, sy); // halo keeps the label legible over dots
-      ctx.fillStyle = ink; ctx.fillText(p.name, sx, sy);                            // text wears the text token, not the series colour
+      ctx.lineWidth = 4; ctx.strokeStyle = surface; ctx.strokeText(label, sx, sy); // halo keeps the label legible over dots
+      ctx.fillStyle = ink; ctx.fillText(label, sx, sy);                            // text wears the text token, not the series colour
     }
 
     if (active && !active.real) { // hovered background dot: lift it
@@ -252,7 +255,7 @@
       el("div", { class: "who" },
         el("span", { class: "swatch", style: `background:${pointColor(p)}` }),
         el("h2", { textContent: displayName(p) })),
-      el("p", { class: "meta", textContent: p.real ? `Enrolled ${p.enrolled_at.slice(0, 16).replace("T", " ")} UTC` : "Held-out Aalto subject" }));
+      el("p", { class: "meta", textContent: `${p.real ? `Enrolled ${p.enrolled_at.slice(0, 16).replace("T", " ")} UTC` : "Held-out Aalto subject"} · from ${p.enroll_prompts} prompt${p.enroll_prompts === 1 ? "" : "s"}` }));
 
     inspector.append(el("h3", { textContent: "Nearest in 128-D" }));
     const nn = el("div", { class: "nn" });
@@ -279,7 +282,7 @@
     const real = points.filter((p) => p.real);
     for (const p of real) {
       const chip = el("button", { class: "chip", type: "button", ariaPressed: String(pinned === p) },
-        el("span", { class: "swatch", style: `background:${pointColor(p)}` }), p.name);
+        el("span", { class: "swatch", style: `background:${pointColor(p)}` }), tagged(p));
       chip.setAttribute("aria-pressed", String(pinned === p));
       chip.onmouseenter = chip.onfocus = () => { hovered = p; draw(); renderInspector(); };
       chip.onmouseleave = chip.onblur = () => { hovered = null; draw(); renderInspector(); };
@@ -294,12 +297,12 @@
   function renderTable() {
     const table = document.getElementById("table");
     const head = el("tr");
-    for (const t of ["Person", "Type", "Nearest in 128-D", "Cosine", "x", "y"]) head.append(el("th", { textContent: t }));
+    for (const t of ["Person", "Type", "Prompts", "Nearest in 128-D", "Cosine", "x", "y"]) head.append(el("th", { textContent: t }));
     table.replaceChildren(el("thead", {}, head));
     const body = el("tbody");
     for (const p of [...points].sort((a, b) => Number(b.real) - Number(a.real))) {
       const n = p.neighbors[0], tr = el("tr");
-      tr.append(el("td", { textContent: displayName(p) }), el("td", { textContent: p.real ? "enrolled" : "background" }),
+      tr.append(el("td", { textContent: displayName(p) }), el("td", { textContent: p.real ? "enrolled" : "background" }), el("td", { class: "num mono", textContent: p.enroll_prompts }),
         el("td", { textContent: n ? displayName(n) : "" }), el("td", { class: "num mono", textContent: n ? n.cosine.toFixed(3) : "" }),
         el("td", { class: "num mono", textContent: p.x.toFixed(2) }), el("td", { class: "num mono", textContent: p.y.toFixed(2) }));
       body.append(tr);

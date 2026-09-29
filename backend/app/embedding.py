@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from features.extract import extract_features
 from model.network import KeystrokeEncoder
 
 CHECKPOINT_PATH = Path(__file__).resolve().parent.parent.parent / "model" / "encoder_hard.pt"
@@ -36,3 +37,15 @@ def embed(features: tuple[np.ndarray, np.ndarray]) -> np.ndarray:
     window_embeddings = _load_encoder()(torch.from_numpy(windows), torch.from_numpy(mask)).numpy()
     mean = window_embeddings.mean(axis=0)
     return mean / np.linalg.norm(mean)
+
+
+def embed_sessions(sessions) -> np.ndarray:
+    """One vector for several typed prompts: the mean of their per-prompt embeddings.
+
+    Enrolment templates and multi-prompt queries both go through here, so the two sides are pooled
+    identically (and the same way eval/calibrate_auth.py measured). Not re-normalized: the stored
+    template has always been the raw mean, and cosine scoring normalizes anyway.
+    Raises ValueError if any prompt is below features.extract.MIN_KEYSTROKES.
+    """
+    embeddings = [embed(extract_features([e.model_dump() for e in s.events])) for s in sessions]
+    return np.mean(np.stack(embeddings), axis=0)

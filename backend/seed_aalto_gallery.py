@@ -58,7 +58,7 @@ def main():
         by_session = sessions[subject]
         first_sessions = sorted(by_session, key=int)[:ENROLL_SESSIONS]  # first 5 in time order
         embeddings = [embed((np.array(windows[by_session[s]]), np.array(mask[by_session[s]]))) for s in first_sessions]
-        add_entry(PREFIX + subject, PREFIX + subject, np.mean(np.stack(embeddings), axis=0).tolist())
+        add_entry(PREFIX + subject, PREFIX + subject, np.mean(np.stack(embeddings), axis=0).tolist(), ENROLL_SESSIONS)
     print(f"enrolled {len(chosen)} held-out Aalto people (of {len(eligible)} eligible) into {DB_PATH}")
 
 

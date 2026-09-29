@@ -1,0 +1,241 @@
+{
+  "authentication": {
+    "1,1": {
+      "eer_percent": 4.603,
+      "eer_threshold": 0.3696,
+      "genuine_scores": 3000,
+      "impostor_scores": 2997000,
+      "far_0.01": {
+        "threshold": 0.5248,
+        "frr_percent": 21.767,
+        "far_percent": 1.0
+      },
+      "far_0.001": {
+        "threshold": 0.6835,
+        "frr_percent": 58.767,
+        "far_percent": 0.1
+      },
+      "subjects": 1000
+    },
+    "1,5": {
+      "eer_percent": 2.086,
+      "eer_threshold": 0.4906,
+      "genuine_scores": 1000,
+      "impostor_scores": 999000,
+      "far_0.01": {
+        "threshold": 0.561,
+        "frr_percent": 5.5,
+        "far_percent": 1.0
+      },
+      "far_0.001": {
+        "threshold": 0.7201,
+        "frr_percent": 33.2,
+        "far_percent": 0.1
+      },
+      "subjects": 1000
+    },
+    "1,10": {
+      "eer_percent": 1.9,
+      "eer_threshold": 0.5059,
+      "genuine_scores": 1000,
+      "impostor_scores": 999000,
+      "far_0.01": {
+        "threshold": 0.569,
+        "frr_percent": 4.1,
+        "far_percent": 1.0
+      },
+      "far_0.001": {
+        "threshold": 0.7285,
+        "frr_percent": 27.0,
+        "far_percent": 0.1
+      },
+      "subjects": 1000
+    },
+    "5,1": {
+      "eer_percent": 1.967,
+      "eer_threshold": 0.4969,
+      "genuine_scores": 3000,
+      "impostor_scores": 2997000,
+      "far_0.01": {
+        "threshold": 0.5624,
+        "frr_percent": 5.533,
+        "far_percent": 1.0
+      },
+      "far_0.001": {
+        "threshold": 0.7194,
+        "frr_percent": 32.267,
+        "far_percent": 0.1
+      },
+      "subjects": 1000
+    },
+    "5,5": {
+      "eer_percent": 0.291,
+      "eer_threshold": 0.7137,
+      "genuine_scores": 1000,
+      "impostor_scores": 999000,
+      "far_0.01": {
+        "threshold": 0.6144,
+        "frr_percent": 0.1,
+        "far_percent": 1.0
+      },
+      "far_0.001": {
+        "threshold": 0.7725,
+        "frr_percent": 1.8,
+        "far_percent": 0.1
+      },
+      "subjects": 1000
+    },
+    "5,10": {
+      "eer_percent": 0.115,
+      "eer_threshold": 0.768,
+      "genuine_scores": 1000,
+      "impostor_scores": 999000,
+      "far_0.01": {
+        "threshold": 0.6263,
+        "frr_percent": 0.0,
+        "far_percent": 1.0
+      },
+      "far_0.001": {
+        "threshold": 0.7825,
+        "frr_percent": 0.5,
+        "far_percent": 0.1
+      },
+      "subjects": 1000
+    },
+    "10,1": {
+      "eer_percent": 1.798,
+      "eer_threshold": 0.5142,
+      "genuine_scores": 3000,
+      "impostor_scores": 2997000,
+      "far_0.01": {
+        "threshold": 0.57,
+        "frr_percent": 4.3,
+        "far_percent": 1.0
+      },
+      "far_0.001": {
+        "threshold": 0.729,
+        "frr_percent": 28.9,
+        "far_percent": 0.1
+      },
+      "subjects": 1000
+    },
+    "10,5": {
+      "eer_percent": 0.122,
+      "eer_threshold": 0.761,
+      "genuine_scores": 1000,
+      "impostor_scores": 999000,
+      "far_0.01": {
+        "threshold": 0.6256,
+        "frr_percent": 0.0,
+        "far_percent": 1.0
+      },
+      "far_0.001": {
+        "threshold": 0.7809,
+        "frr_percent": 0.6,
+        "far_percent": 0.1
+      },
+      "subjects": 1000
+    }
+  },
+  "identification": {
+    "1": {
+      "rank1_percent": 70.4,
+      "operating_points": {
+        "0.1": {
+          "threshold": 0.7867,
+          "fpir_percent": 10.0,
+          "dir_percent": 41.04,
+          "misidentified_percent": 6.24,
+          "not_named_percent": 52.72
+        },
+        "0.05": {
+          "threshold": 0.8164,
+          "fpir_percent": 5.0,
+          "dir_percent": 30.24,
+          "misidentified_percent": 3.2,
+          "not_named_percent": 66.56
+        },
+        "0.02": {
+          "threshold": 0.8454,
+          "fpir_percent": 2.0,
+          "dir_percent": 19.36,
+          "misidentified_percent": 1.44,
+          "not_named_percent": 79.2
+        },
+        "0.01": {
+          "threshold": 0.8678,
+          "fpir_percent": 1.0,
+          "dir_percent": 12.56,
+          "misidentified_percent": 0.64,
+          "not_named_percent": 86.8
+        }
+      }
+    },
+    "5": {
+      "rank1_percent": 97.12,
+      "operating_points": {
+        "0.1": {
+          "threshold": 0.8336,
+          "fpir_percent": 10.0,
+          "dir_percent": 88.4,
+          "misidentified_percent": 1.48,
+          "not_named_percent": 10.12
+        },
+        "0.05": {
+          "threshold": 0.8584,
+          "fpir_percent": 5.0,
+          "dir_percent": 79.88,
+          "misidentified_percent": 0.76,
+          "not_named_percent": 19.36
+        },
+        "0.02": {
+          "threshold": 0.8828,
+          "fpir_percent": 2.0,
+          "dir_percent": 64.88,
+          "misidentified_percent": 0.48,
+          "not_named_percent": 34.64
+        },
+        "0.01": {
+          "threshold": 0.8971,
+          "fpir_percent": 1.0,
+          "dir_percent": 53.0,
+          "misidentified_percent": 0.24,
+          "not_named_percent": 46.76
+        }
+      }
+    },
+    "10": {
+      "rank1_percent": 98.36,
+      "operating_points": {
+        "0.1": {
+          "threshold": 0.8457,
+          "fpir_percent": 10.0,
+          "dir_percent": 94.8,
+          "misidentified_percent": 1.0,
+          "not_named_percent": 4.2
+        },
+        "0.05": {
+          "threshold": 0.8651,
+          "fpir_percent": 5.0,
+          "dir_percent": 91.08,
+          "misidentified_percent": 0.88,
+          "not_named_percent": 8.04
+        },
+        "0.02": {
+          "threshold": 0.8936,
+          "fpir_percent": 2.0,
+          "dir_percent": 78.4,
+          "misidentified_percent": 0.64,
+          "not_named_percent": 20.96
+        },
+        "0.01": {
+          "threshold": 0.9118,
+          "fpir_percent": 1.0,
+          "dir_percent": 63.68,
+          "misidentified_percent": 0.4,
+          "not_named_percent": 35.92
+        }
+      }
+    }
+  }
+}
