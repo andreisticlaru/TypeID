@@ -24,6 +24,8 @@ BACKGROUND_PREFIX = "aalto_"
 MIN_BACKGROUND = 30  # below this UMAP has too little to fit; fall back to PCA
 NEIGHBORS = 3
 MAP_PAGE = Path(__file__).resolve().parent.parent / "static" / "map.html"
+# The capture UI's favicon, served from where the frontend keeps it rather than copied here.
+MARK = Path(__file__).resolve().parents[3] / "frontend" / "public" / "mark.png"
 
 _fit_lock = threading.Lock()
 _fitted: dict = {"ids": None, "reducer": None}
@@ -66,6 +68,11 @@ def map_page() -> FileResponse:
     return FileResponse(MAP_PAGE)
 
 
+@router.get("/map/mark.png")
+def map_icon() -> FileResponse:
+    return FileResponse(MARK)
+
+
 @router.get("/map/points")
 def map_points() -> dict:
     entries = get_all_entries()
@@ -96,6 +103,7 @@ def map_points() -> dict:
             "vector": [round(float(v), 4) for v in vectors[i]],
             "norm": round(float(np.linalg.norm(vectors[i])), 3),
             "enrolled_at": entries[i]["enrolled_at"],
+            "enroll_prompts": entries[i]["enroll_prompts"],
             "neighbors": [
                 {"id": ids[j], "name": entries[j]["name"], "real": j in slot, "cosine": round(float(similarity[i, j]), 3)}
                 for j in nearest[i]

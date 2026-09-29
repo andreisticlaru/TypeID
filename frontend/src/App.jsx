@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { pickSentence } from "./sentences.js";
+import { transcriptionMatch } from "./transcription.js";
 
 const API = "/api"; // proxied to the backend by vite.config.js
-const ENROLL_SESSIONS = 5; // eval: more enrollment sentences -> markedly better accuracy
+// Prompts per operation. Thresholds exist for exactly these counts (backend/app/thresholds.py);
+// more prompts give a steadier profile, and eval/calibrate_auth.py measured how much that buys.
+const PROMPT_COUNTS = [1, 5, 10];
+const DEFAULT_PROMPTS = { enroll: 5, identify: 1, authenticate: 1 };
+const SHORTLIST = 5; // identify returns the top 10; ranks past this are shown greyed out
 // Backend rejects fewer than 26 paired keystrokes (features.extract.MIN_KEYSTROKES + 1); leave margin.
 const MIN_KEYSTROKES = 30;
+// Below this the typing isn't transcription any more (see TODO item 1): someone typing a phrase
+// they know by heart would match on memorised motor habit instead of rhythm.
+const MIN_MATCH = 0.9;
 
 async function postJson(path, body) {
   const res = await fetch(`${API}${path}`, {
@@ -173,17 +181,40 @@ function Status({ status }) {
   );
 }
 
+function PromptProgress({ done, total }) {
+  return (
+    <div className="mt-2 flex items-center gap-1.5">
+      {Array.from({ length: total }, (_, i) => (
+        <span
+          key={i}
+          className={`h-1 rounded-full transition-colors duration-300 ${total > 5 ? "w-3.5" : "w-7"}`}
+          style={{
+            background:
+              i < done ? "var(--color-accent)" : i === done ? "var(--color-accent-deep)" : "var(--color-border)",
+          }}
+        />
+      ))}
+      <span className="ml-2 text-[13px] text-[var(--color-text-secondary)]">
+        {done + 1} of {total}
+      </span>
+    </div>
+  );
+}
+
 export default function App() {
   const inputRef = useRef(null);
   const eventsRef = useRef([]);
   const keystrokeCountRef = useRef(0);
-  const enrollSessionsRef = useRef([]);
+  const sessionsRef = useRef([]); // prompts typed so far in the current enrol / identify / verify
   const usedSentencesRef = useRef([]); // enrollment never repeats a sentence
 
   const [mode, setMode] = useState("enroll");
   const [name, setName] = useState("");
   const [nameLocked, setNameLocked] = useState(false);
   const [sessionCount, setSessionCount] = useState(0);
+  const [promptCounts, setPromptCounts] = useState(DEFAULT_PROMPTS);
+  const promptCount = promptCounts[mode];
+  const [identifyRates, setIdentifyRates] = useState(null); // measured outcomes per prompt count
   const [enrolled, setEnrolled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(null); // { kind: success | error | declined, text }
@@ -203,6 +234,7 @@ export default function App() {
   const [stats, setStats] = useState({ count: 0, duration: "0.0s", wpm: 0, dwell: "0ms", flight: "0ms" });
   const [dwellValues, setDwellValues] = useState([]);
   const [rawText, setRawText] = useState("");
+  const [typed, setTyped] = useState(""); // mirrors the typing box, for the transcription check
 
   // The typing box only exists once we know whose typing it is: the enrolling person, the
   // identify query, or — for authenticate — the identity being claimed.
@@ -213,6 +245,7 @@ export default function App() {
     eventsRef.current = [];
     keystrokeCountRef.current = 0;
     if (inputRef.current) inputRef.current.value = "";
+    setTyped("");
     setRecordDisabled(true);
     setProgressText("0 keystrokes");
     setShowResults(false);
@@ -221,8 +254,9 @@ export default function App() {
     inputRef.current?.focus();
   }
 
-  function newSentence(accumulate) {
-    const next = pickSentence(usedSentencesRef.current);
+  // `forMode`: switchMode calls this before the setMode update lands, so it passes the new mode.
+  function newSentence(accumulate, forMode = mode) {
+    const next = pickSentence(forMode, usedSentencesRef.current);
     usedSentencesRef.current = accumulate ? [...usedSentencesRef.current, next] : [next];
     setSentence(next);
     resetCapture();
@@ -237,7 +271,7 @@ export default function App() {
   }
 
   function resetEnrollment() {
-    enrollSessionsRef.current = [];
+    sessionsRef.current = [];
     usedSentencesRef.current = [];
     setName("");
     setNameLocked(false);
@@ -250,8 +284,17 @@ export default function App() {
 
   // Recorded samples are unrecoverable once dropped, so anything that would drop them asks first.
   function guardDiscard(run) {
-    if (enrollSessionsRef.current.length > 0) setPendingDiscard({ run });
+    if (sessionsRef.current.length > 0) setPendingDiscard({ run });
     else run();
+  }
+
+  function changePromptCount(n) {
+    if (n === promptCount) return;
+    guardDiscard(() => {
+      setPromptCounts((counts) => ({ ...counts, [mode]: n }));
+      setSessionCount(0);
+      resetCapture();
+    });
   }
 
   function switchMode(next) {
@@ -262,7 +305,7 @@ export default function App() {
       setAuth(null);
       setClaimId("");
       resetEnrollment();
-      if (next === "identify") newSentence(false);
+      if (next === "identify") newSentence(false, next);
       if (next === "authenticate") {
         fetch(`${API}/people`)
           .then((r) => r.json())
@@ -279,11 +322,26 @@ export default function App() {
     if (personId) newSentence(false);
   }
 
+  // After a verdict: clear it and start a fresh round on a new prompt.
+  function nextRound() {
+    setMatches(null);
+    setAuth(null);
+    setStatus(null);
+    newSentence(false);
+  }
+
   function onKeyDown(e) {
+    // Typing at a finished verdict means "go again": start a fresh round on a new prompt. The key
+    // itself is swallowed, since it was aimed at the old prompt.
+    if (showingResult) {
+      e.preventDefault();
+      nextRound();
+      return;
+    }
     // Enter submits (same as the button) and is never part of the typing sample.
     if (e.key === "Enter") {
       e.preventDefault();
-      if (!recordDisabled && !busy) submit();
+      if (canSubmit && !busy) submit();
       return;
     }
     onKeyEvent(e);
@@ -302,7 +360,7 @@ export default function App() {
       const count = keystrokeCountRef.current;
       const remaining = MIN_KEYSTROKES - count;
       setProgressText(
-        remaining > 0 ? `${count} keystrokes · ${remaining} more to record` : `${count} keystrokes · ready`
+        remaining > 0 ? `${count} keystrokes · ${remaining} more to record` : `${count} keystrokes`
       );
       setRecordDisabled(count < MIN_KEYSTROKES);
     }
@@ -338,11 +396,11 @@ export default function App() {
     setCollision(null);
     try {
       await postJson("/enroll", { person_id: name.toLowerCase(), name, sessions, replace });
-      enrollSessionsRef.current = [];
+      sessionsRef.current = [];
       setEnrolled(true);
       setStatus({
         kind: "success",
-        text: `${name} is enrolled from ${ENROLL_SESSIONS} typing samples. Switch to Identify to test it.`,
+        text: `${name} is enrolled from ${sessions.length} typing ${sessions.length === 1 ? "sample" : "samples"}.`,
       });
     } catch (err) {
       if (err.status === 409) {
@@ -359,51 +417,47 @@ export default function App() {
   }
 
   async function submit() {
-    const events = eventsRef.current;
+    const sessions = [...sessionsRef.current, { sentence, events: eventsRef.current }];
+    if (sessions.length < promptCount) {
+      sessionsRef.current = sessions;
+      setSessionCount(sessions.length);
+      setStatus(null);
+      newSentence(true);
+      return;
+    }
     if (mode === "enroll") {
-      const sessions = [...enrollSessionsRef.current, { sentence, events }];
-      if (sessions.length < ENROLL_SESSIONS) {
-        enrollSessionsRef.current = sessions;
-        setSessionCount(sessions.length);
-        setStatus(null);
-        newSentence(true);
-        return;
-      }
       await sendEnrollment(sessions, false);
-    } else if (mode === "authenticate") {
-      inputRef.current?.blur();
-      renderResults();
-      setBusy(true);
-      try {
-        setAuth(await postJson("/authenticate", { person_id: claimId, sentence, events }));
+      return;
+    }
+
+    // "What was measured" shows the last prompt; the decision uses all of them.
+    inputRef.current?.blur();
+    renderResults();
+    sessionsRef.current = [];
+    setSessionCount(0);
+    setBusy(true);
+    try {
+      if (mode === "authenticate") {
+        setAuth(await postJson("/authenticate", { person_id: claimId, sessions }));
         setStatus(null);
-      } catch (err) {
-        setStatus({ kind: "error", text: err.message });
-      } finally {
-        setBusy(false);
-      }
-    } else {
-      inputRef.current?.blur();
-      renderResults();
-      setBusy(true);
-      try {
-        const res = await postJson("/identify", { sentence, events });
+      } else {
+        const res = await postJson("/identify", { sessions });
         setMatches(res);
         setStatus(
           res.matched
             ? null
             : {
                 kind: "declined",
-                text: `No confident match. Every enrolled person scored below the ${res.min_confidence.toFixed(
+                text: `No confident match. Nobody reached the ${res.min_confidence.toFixed(
                   2
-                )} similarity threshold, so TypeID declined to guess rather than force a top pick.`,
+                )} similarity threshold, so TypeID declined to name anyone. The closest candidates are below.`,
               }
         );
-      } catch (err) {
-        setStatus({ kind: "error", text: err.message });
-      } finally {
-        setBusy(false);
       }
+    } catch (err) {
+      setStatus({ kind: "error", text: err.message });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -411,8 +465,22 @@ export default function App() {
     if (capturing) inputRef.current?.focus();
   }, [capturing, sentence]);
 
+  // Measured error per prompt count, from the backend's calibration table rather than a copy here.
+  useEffect(() => {
+    fetch(`${API}/identify/rates`)
+      .then((r) => r.json())
+      .then(setIdentifyRates)
+      .catch(() => {}); // the hint is optional; identify works without it
+  }, []);
+
+  const match = transcriptionMatch(sentence, typed);
+  const matchPercent = Math.round(match.accuracy * 100);
+  // Once a verdict is showing, the typed prompts are spent: the next round starts on a new prompt,
+  // so last round's keystrokes can't be resubmitted as the first prompt of a new one.
+  const showingResult = mode !== "enroll" && !!(matches || auth);
+  const canSubmit = !recordDisabled && !showingResult && match.accuracy >= MIN_MATCH;
   const maxDwell = Math.max(...dwellValues, 1);
-  const lastEnrollSentence = sessionCount === ENROLL_SESSIONS - 1;
+  const lastPrompt = sessionCount === promptCount - 1;
   const pillBase = "px-4 py-1.5 rounded-full border-0 text-sm font-semibold cursor-pointer transition-colors duration-150";
   // Disabled goes flat rather than faded: a translucent accent muddies into an unreadable teal.
   const primaryButton =
@@ -460,10 +528,56 @@ export default function App() {
           </a>
         </div>
 
+        {!enrolled && (
+          <fieldset className="m-0 p-0 border-0 mb-7">
+            <legend className="mb-2.5 p-0 text-[13px] font-medium text-[var(--color-text-secondary)]">
+              Prompts to type · more prompts, steadier profile, fewer mistakes
+            </legend>
+            <div className="flex gap-2">
+              {PROMPT_COUNTS.map((n) => (
+                <label
+                  key={n}
+                  className={`grid place-items-center min-w-11 h-11 px-3 cursor-pointer rounded-full text-[15px] font-semibold tabular-nums border transition-colors duration-150 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-[var(--color-accent)] ${
+                    promptCount === n
+                      ? "border-transparent bg-[var(--color-accent)] text-[var(--color-card)]"
+                      : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:border-[var(--color-accent-deep)]"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="prompt-count"
+                    value={n}
+                    checked={promptCount === n}
+                    onChange={() => changePromptCount(n)}
+                    className="sr-only"
+                  />
+                  {n}
+                </label>
+              ))}
+            </div>
+            {/* The cost of a snappy one-prompt identify, stated up front rather than discovered. */}
+            {mode === "identify" && identifyRates && (
+              <p className="m-0 mt-3 text-[12.5px] leading-snug text-[var(--color-text-secondary)]">
+                Finds an enrolled person{" "}
+                {PROMPT_COUNTS.map((n, i) => (
+                  <span key={n}>
+                    {i > 0 && " · "}
+                    <span className={`whitespace-nowrap ${n === promptCount ? "font-semibold text-[var(--color-text)]" : ""}`}>
+                      {Math.round(identifyRates.found_percent[n])}% with {n}
+                    </span>
+                  </span>
+                ))}
+                . Names someone who isn't enrolled about{" "}
+                {Math.round(identifyRates.stranger_named_percent[promptCount])}% of the time.
+              </p>
+            )}
+          </fieldset>
+        )}
+
         {mode === "enroll" && !nameLocked && (
           <>
             <p className="m-0 mb-6 text-[15px] leading-relaxed text-[var(--color-text-secondary)]">
-              Enrolling records your rhythm across {ENROLL_SESSIONS} short sentences. Nothing you type is
+              Enrolling records your rhythm across {promptCount === 1 ? "one short sentence" : `${promptCount} short sentences`}. Nothing you type is
               stored as text — only the timing between keys.
             </p>
             <label htmlFor="person-name" className="block mb-2 text-[13px] font-medium text-[var(--color-text-secondary)]">
@@ -474,7 +588,13 @@ export default function App() {
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && lockName()}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                // lockName moves focus into the typing box mid-keypress; without this, the browser
+                // inserts this Enter's line break there and every character after it misaligns.
+                e.preventDefault();
+                lockName();
+              }}
               placeholder="e.g. Andrei"
               className="w-full mb-7 border-0 border-b border-[var(--color-border)] bg-transparent text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] text-[17px] py-2 outline-none focus:border-b-[var(--color-accent)]"
             />
@@ -533,25 +653,7 @@ export default function App() {
           <div className="mb-7 flex items-center justify-between gap-4">
             <div className="min-w-0">
               <div className="text-[17px] font-medium truncate">Enrolling {name}</div>
-              <div className="mt-2 flex items-center gap-1.5">
-                {Array.from({ length: ENROLL_SESSIONS }, (_, i) => (
-                  <span
-                    key={i}
-                    className="h-1 w-7 rounded-full transition-colors duration-300"
-                    style={{
-                      background:
-                        i < sessionCount
-                          ? "var(--color-accent)"
-                          : i === sessionCount
-                            ? "var(--color-accent-deep)"
-                            : "var(--color-border)",
-                    }}
-                  />
-                ))}
-                <span className="ml-2 text-[13px] text-[var(--color-text-secondary)]">
-                  {sessionCount + 1} of {ENROLL_SESSIONS}
-                </span>
-              </div>
+              <PromptProgress done={sessionCount} total={promptCount} />
             </div>
             <button
               onClick={() => guardDiscard(resetEnrollment)}
@@ -567,7 +669,8 @@ export default function App() {
           <>
             {mode === "identify" && (
               <p className="m-0 mb-6 text-[15px] leading-relaxed text-[var(--color-text-secondary)]">
-                Type the sentence below and TypeID will rank it against everyone enrolled.
+                Type {promptCount === 1 ? "the sentence below" : `${promptCount} sentences`} and TypeID will rank
+                your rhythm against everyone enrolled.
               </p>
             )}
             {mode === "authenticate" && (
@@ -576,16 +679,41 @@ export default function App() {
                 <span className="font-semibold text-[var(--color-text)]">
                   {people.find((p) => p.person_id === claimId)?.name ?? claimId}
                 </span>
-                . Type the sentence below to prove it.
+                . Type {promptCount === 1 ? "the sentence below" : `${promptCount} sentences`} to prove it.
               </p>
+            )}
+
+            {mode !== "enroll" && promptCount > 1 && !showingResult && (
+              <div className="mb-5">
+                <PromptProgress done={sessionCount} total={promptCount} />
+              </div>
             )}
 
             <div className="flex items-start gap-3 mb-7">
               <p className="flex-1 m-0 font-display text-[22px] sm:text-2xl leading-snug font-medium tracking-tight">
-                {sentence}
+                <span className="sr-only">{sentence}</span>
+                <span aria-hidden="true">
+                  {[...sentence].map((ch, i) => (
+                    <span
+                      key={i}
+                      className={
+                        match.chars[i] === "correct"
+                          ? "text-[var(--color-text)]"
+                          : match.chars[i] === "wrong"
+                            ? "rounded-sm text-[var(--color-danger)] bg-[color-mix(in_srgb,var(--color-danger)_20%,transparent)]"
+                            : `text-[var(--color-text-secondary)]${
+                                i === typed.length ? " underline decoration-2 underline-offset-4 decoration-[var(--color-accent)]" : ""
+                              }`
+                      }
+                    >
+                      {ch}
+                    </span>
+                  ))}
+                  {match.extra > 0 && <span className="text-[var(--color-danger)]"> +{match.extra}</span>}
+                </span>
               </p>
               <button
-                onClick={() => newSentence(mode === "enroll")}
+                onClick={() => newSentence(true)}
                 className="shrink-0 grid place-items-center w-9 h-9 rounded-full border-0 bg-[var(--color-surface)] text-[var(--color-text-secondary)] cursor-pointer transition duration-150 hover:text-[var(--color-text)] hover:rotate-45"
                 title="Swap in a different sentence"
                 aria-label="Swap in a different sentence"
@@ -602,7 +730,10 @@ export default function App() {
               ref={inputRef}
               onKeyDown={onKeyDown}
               onKeyUp={onKeyUp}
+              onInput={(e) => setTyped(e.target.value)}
               onPaste={(e) => e.preventDefault()}
+              readOnly={showingResult}
+              onFocus={() => showingResult && nextRound()} // clicking back in to type starts the next round
               className="w-full resize-none border-0 border-b border-[var(--color-border)] bg-transparent text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] font-sans text-[17px] leading-relaxed py-2 outline-none transition-colors duration-150 focus:border-b-[var(--color-accent)]"
               rows="3"
               placeholder="Start typing… (pasting is disabled — the rhythm is the point)"
@@ -612,33 +743,57 @@ export default function App() {
               spellCheck="false"
             />
 
-            <div className="mt-2.5 text-[13px] tabular-nums text-[var(--color-text-secondary)]">{progressText}</div>
-
-            <button onClick={submit} disabled={recordDisabled || busy} className={`mt-7 ${primaryButton}`}>
-              <span className="inline-flex items-center justify-center gap-2.5">
-                {busy && <ScanRings size={17} active />}
-                {busy
-                  ? mode === "identify"
-                    ? "Comparing against the gallery…"
-                    : mode === "authenticate"
-                      ? "Checking against the claim…"
-                      : "Building your profile…"
-                  : mode === "identify"
-                    ? "Identify me"
-                    : mode === "authenticate"
-                      ? "Verify me"
-                      : lastEnrollSentence
-                        ? "Finish enrollment"
-                        : "Next sentence"}
+            <div className="mt-2.5 text-[13px] tabular-nums text-[var(--color-text-secondary)]">
+              {progressText} ·{" "}
+              <span className={typed && match.accuracy < MIN_MATCH ? "text-[var(--color-danger)]" : ""}>
+                {matchPercent}% match{match.accuracy < MIN_MATCH && `, ${Math.round(MIN_MATCH * 100)}% needed`}
               </span>
-            </button>
+            </div>
+
+            {showingResult ? (
+              // Takes the submit button's place and focus, so Enter moves straight on to the next round. The
+              // distinct keys make React mount a new element; reusing the old one would skip autoFocus.
+              <button
+                key="next"
+                onClick={nextRound}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault(); // same focus hand-off as the name field: keep the newline out of the box
+                    nextRound();
+                  } else if (e.key.length === 1 && e.key !== " ") nextRound(); // just start typing
+                }}
+                autoFocus
+                className={`mt-7 ${primaryButton}`}
+              >
+                Try another sentence
+              </button>
+            ) : (
+              <button key="submit" onClick={submit} disabled={!canSubmit || busy} className={`mt-7 ${primaryButton}`}>
+                <span className="inline-flex items-center justify-center gap-2.5">
+                  {busy && <ScanRings size={17} active />}
+                  {busy
+                    ? mode === "identify"
+                      ? "Comparing against the gallery…"
+                      : mode === "authenticate"
+                        ? "Checking against the claim…"
+                        : "Building your profile…"
+                    : !lastPrompt
+                      ? "Next sentence"
+                      : mode === "identify"
+                        ? "Identify me"
+                        : mode === "authenticate"
+                          ? "Verify me"
+                          : "Finish enrollment"}
+                </span>
+              </button>
+            )}
           </>
         )}
 
         {pendingDiscard && (
           <Choice
-            question={`Discard ${enrollSessionsRef.current.length} recorded ${
-              enrollSessionsRef.current.length === 1 ? "sample" : "samples"
+            question={`Discard ${sessionsRef.current.length} recorded ${
+              sessionsRef.current.length === 1 ? "sample" : "samples"
             }? They can't be recovered.`}
             actions={[
               { label: "Keep recording", onClick: () => setPendingDiscard(null) },
@@ -648,7 +803,7 @@ export default function App() {
                 onClick: () => {
                   const { run } = pendingDiscard;
                   setPendingDiscard(null);
-                  enrollSessionsRef.current = [];
+                  sessionsRef.current = [];
                   run();
                 },
               },
@@ -672,12 +827,15 @@ export default function App() {
 
         <Status status={status} />
 
-        {mode === "identify" && matches?.matched && (
+        {mode === "identify" && matches?.results.length > 0 && (
           <div className="mt-7 animate-[rise_380ms_cubic-bezier(0.16,1,0.3,1)]">
             <div className="flex items-baseline justify-between gap-3 mb-4">
-              <h2 className="m-0 font-display text-[17px] font-semibold tracking-tight">Ranked candidates</h2>
+              <h2 className="m-0 font-display text-[17px] font-semibold tracking-tight">
+                {matches.matched ? "Ranked candidates" : "Closest candidates"}
+              </h2>
               <span className="text-[12.5px] tabular-nums text-[var(--color-text-secondary)]">
-                threshold {matches.min_confidence.toFixed(2)}
+                threshold {matches.min_confidence.toFixed(2)} · {matches.query_prompts}{" "}
+                {matches.query_prompts === 1 ? "prompt" : "prompts"} · finds {Math.round(matches.found_percent)}%
               </span>
             </div>
 
@@ -685,9 +843,10 @@ export default function App() {
               {matches.results.map((r, i) => {
                 const band = confidenceBand(r.similarity, matches.min_confidence);
                 return (
-                  <li key={r.person_id}>
+                  // Ranks 6-10 are context (how crowded it is just below the shortlist), so they recede.
+                  <li key={r.person_id} className={i >= SHORTLIST ? "opacity-45" : ""}>
                     <div className="flex items-baseline gap-2">
-                      <span className="w-4 shrink-0 text-[13px] tabular-nums text-[var(--color-text-secondary)]">
+                      <span className="w-5 shrink-0 text-[13px] tabular-nums text-[var(--color-text-secondary)]">
                         {i + 1}
                       </span>
                       <span className={`truncate ${i === 0 ? "text-[17px] font-semibold" : "text-[15px]"}`}>
@@ -700,7 +859,7 @@ export default function App() {
                         {r.similarity.toFixed(3)}
                       </span>
                     </div>
-                    <div className="relative mt-1.5 ml-6 h-1.5 rounded-full bg-[var(--color-surface)] overflow-hidden">
+                    <div className="relative mt-1.5 ml-7 h-1.5 rounded-full bg-[var(--color-surface)] overflow-hidden">
                       <div
                         className="h-full rounded-full origin-left animate-[sweep_620ms_cubic-bezier(0.16,1,0.3,1)]"
                         style={{ width: `${Math.max(r.similarity, 0) * 100}%`, background: band.color }}
@@ -743,7 +902,7 @@ export default function App() {
               <div className="flex items-baseline justify-between text-[12.5px] tabular-nums text-[var(--color-text-secondary)]">
                 <span>similarity {auth.similarity.toFixed(3)}</span>
                 <span>
-                  threshold {auth.threshold.toFixed(2)} · {auth.operating_point}
+                  threshold {auth.threshold.toFixed(2)} · {auth.operating_point} {auth.eer_percent}%
                 </span>
               </div>
               <div className="relative mt-1.5 h-2 rounded-full bg-[var(--color-surface)] overflow-hidden">
@@ -760,15 +919,27 @@ export default function App() {
                   style={{ left: `${auth.threshold * 100}%` }}
                 />
               </div>
+              <p className="m-0 mt-3 text-[12.5px] leading-snug text-[var(--color-text-secondary)]">
+                {auth.name} enrolled from {auth.enroll_prompts}, verified with {auth.query_prompts}.{" "}
+                {auth.extrapolated
+                  ? `No measured threshold for ${auth.enroll_prompts} + ${auth.query_prompts} (Aalto has at most 15 prompts per person), so this borrows the 10 + 5 one.`
+                  : `At this setting, ${auth.eer_percent}% of decisions are wrong either way.`}
+              </p>
             </div>
-
           </div>
         )}
 
         {enrolled && (
-          <button onClick={resetEnrollment} className={`mt-6 ${ghostButton}`}>
-            Enroll another person
-          </button>
+          // Testing yourself is the point of enrolling, so it's the primary action and takes focus
+          // (Enter continues); enrolling someone else is the quieter alternative.
+          <div className="mt-6 flex flex-col gap-3">
+            <button onClick={() => switchMode("identify")} autoFocus className={primaryButton}>
+              Identify yourself now
+            </button>
+            <button onClick={resetEnrollment} className={ghostButton}>
+              Enroll another person
+            </button>
+          </div>
         )}
 
         <section
@@ -824,18 +995,6 @@ export default function App() {
           >
             {rawText}
           </pre>
-
-          <button
-            onClick={() => {
-              setMatches(null);
-              setAuth(null);
-              setStatus(null);
-              newSentence(false);
-            }}
-            className={`mt-6 ${ghostButton}`}
-          >
-            Try another sentence
-          </button>
         </section>
       </main>
 

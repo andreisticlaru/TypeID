@@ -11,3 +11,4 @@ __pycache__/
 data/preprocessed/
 .venv-model/
 model/*.pt
+backend/identify_log.jsonl

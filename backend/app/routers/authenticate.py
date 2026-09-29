@@ -16,23 +16,14 @@ and background rows are not real people to claim.
 import numpy as np
 from fastapi import APIRouter, HTTPException
 
-from features.extract import extract_features
-
-from ..embedding import embed
+from ..embedding import embed_sessions
 from ..gallery import get_all_entries, get_entry
-from ..schemas import AuthenticateRequest, AuthenticateResponse, Person
+from ..schemas import PROMPT_COUNTS, AuthenticateRequest, AuthenticateResponse, Person
+from ..thresholds import OPERATING_POINT, auth_threshold
 from .identify import cosine_similarity
 from .map import BACKGROUND_PREFIX
 
 router = APIRouter()
-
-# Calibrated on held-out subjects at the equal-error operating point, 5 enrollment sessions
-# (what the UI collects). Produced by: python -m eval.calibrate_auth --checkpoint
-# model/encoder_hard.pt -- see that script's docstring for why the per-subject EER reported in
-# the README cannot be used here.
-# Measured: EER 2.11% at this threshold over 1,000 held-out subjects (FRR 6.10% at FAR 1%).
-AUTH_THRESHOLD = 0.49
-OPERATING_POINT = "EER"
 
 
 @router.get("/people", response_model=list[Person])
@@ -50,19 +41,28 @@ def authenticate(request: AuthenticateRequest) -> AuthenticateResponse:
     if entry is None:
         raise HTTPException(status_code=404, detail="That person is not enrolled.")
 
+    query_prompts = len(request.sessions)
+    if query_prompts not in PROMPT_COUNTS:
+        raise HTTPException(status_code=422, detail=f"Verify with {PROMPT_COUNTS} prompts, got {query_prompts}.")
     try:
-        events = [event.model_dump() for event in request.events]
-        query_embedding = embed(extract_features(events))
+        query_embedding = embed_sessions(request.sessions)
     except ValueError as exc:  # too few keystrokes (features.extract.MIN_KEYSTROKES)
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     similarity = cosine_similarity(query_embedding, np.array(entry["embedding"]))
+    # The threshold depends on how steady both sides are: the claimed template (E prompts) and
+    # this query (Q prompts).
+    threshold, eer, extrapolated = auth_threshold(entry["enroll_prompts"], query_prompts)
 
     return AuthenticateResponse(
         person_id=entry["person_id"],
         name=entry["name"],
-        accepted=similarity >= AUTH_THRESHOLD,
+        accepted=similarity >= threshold,
         similarity=similarity,
-        threshold=AUTH_THRESHOLD,
+        threshold=threshold,
         operating_point=OPERATING_POINT,
+        enroll_prompts=entry["enroll_prompts"],
+        query_prompts=query_prompts,
+        eer_percent=eer,
+        extrapolated=extrapolated,
     )
