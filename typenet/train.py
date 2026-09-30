@@ -1,9 +1,9 @@
 """Train TypeNet on the train-subject split, with the paper's random triplets or in-batch mining.
 
-  paper recipe:  python -u -m typenet.train --steps 30000 --save-every 10000 --out typenet/checkpoints/typenet_a.pt
-  lr 1e-3:       ... --lr 1e-3 --out typenet/checkpoints/typenet_lr1e-3.pt
+  paper recipe:  python -u -m typenet.train --steps 30000 --save-every 10000 --out runs/pilot_old_split/typenet_a.pt
+  lr 1e-3:       ... --lr 1e-3 --out runs/pilot_old_split/typenet_lr1e-3.pt
   + mining:      ... --lr 1e-3 --mine semi --mine-from 10000
-                     --resume typenet/checkpoints/typenet_lr1e-3_step10000.pt --out typenet/checkpoints/typenet_semi.pt
+                     --resume runs/pilot_old_split/typenet_lr1e-3_step10000.pt --out runs/pilot_old_split/typenet_semi.pt
 
 Paper recipe (Sec 4.3): Adam lr 0.05, betas (0.9, 0.999), eps 1e-8; 512 random triplets per batch;
 200 epochs x 150 batches = 30,000 steps. The lr is constant, so the first 30k steps of a longer run ARE
@@ -64,7 +64,7 @@ def main():
     parser.add_argument("--save-every", type=int, default=0)
     parser.add_argument("--resume", default=None)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--out", default="typenet/checkpoints/typenet_a.pt")
+    parser.add_argument("--out", default="runs/pilot_old_split/typenet_a.pt")
     args = parser.parse_args()
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)

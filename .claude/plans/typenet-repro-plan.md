@@ -98,7 +98,8 @@ is live in their app immediately.
 | Speed | 0.95 → 0.16 s/step via `unbind` in the LSTM loop and one grouped pass (`groups=3`) for A/P/N | keep both; they are tested |
 | Pilot comparison was on **our** split with **our** floor | 3,771 eligible test people; galleries overlap across draws | this plan fixes both |
 
-Pilot checkpoints stay in `typenet/checkpoints/` (gitignored); pilot numbers stay in the README labelled as the
+Pilot checkpoints and logs are in `runs/pilot_old_split/`, their scores in
+`comparison/results/pilot_old_split/` (both gitignored); pilot numbers stay in the README labelled as the
 old-split pilot until Phase 4 replaces them.
 
 ### 2.3 Data facts
@@ -209,7 +210,7 @@ dropout 0.5, LSTM 128, last-real-step readout, raw output, squared Euclidean, ma
       skip sessions that raise (fewer than 2 keystrokes) and count them. Save the same four arrays to
       `data/preprocessed_typenet/`. Log progress every 5,000 participants. Run it in the background with a
       watcher (full dataset ≈ 40 min). It must refuse to write anywhere under `data/preprocessed/`.
-- [ ] `.gitignore`: add `data/preprocessed_typenet/` and `runs/`.
+- [x] `.gitignore`: add `data/preprocessed_typenet/` and `runs/` (done early, with `comparison/results/pilot_old_split/`).
 - [ ] Sanity numbers into the Progress log: windows, sessions skipped, % windows with exactly 50 steps, test
       subjects with ≥ 15 sessions (TypeNet-eligible) for both caches.
 

@@ -7,7 +7,7 @@
      pooled, COSINE on the averaged profile -- the backend's scoring rule, so this is the number that
      predicts the live demo. It is not TypeNet's metric; TypeNet's raw embeddings were never trained for it.
 
-run with: python -m comparison.evaluate --checkpoint typenet/checkpoints/typenet_a_step30000.pt --seeds 0 1 2 3 4 5 6 7 8 9
+run with: python -m comparison.evaluate --checkpoint runs/pilot_old_split/typenet_a.pt --seeds 0 1 2 3 4 5 6 7 8 9
 """
 
 from __future__ import annotations

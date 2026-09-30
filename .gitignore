@@ -11,5 +11,9 @@ __pycache__/
 data/preprocessed/
 .venv-model/
 model/*.pt
-typenet/checkpoints/
+
+# Model study work in progress (feat/models-v2)
+runs/
+comparison/results/pilot_old_split/
+data/preprocessed_typenet/
 backend/identify_log.jsonl
