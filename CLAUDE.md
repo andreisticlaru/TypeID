@@ -1,75 +1,79 @@
-# CLAUDE.md — Keystroke Biometrics Identification
+# CLAUDE.md — TypeID (keystroke biometrics)
 
-**Start here:** [README.md](README.md) for project overview and current state. [ARCHITECTURE.md](ARCHITECTURE.md) for technical design details.
+Open-set 1:N identification by typing rhythm: an LSTM maps keystroke timing to an embedding, people enroll into a
+gallery without retraining, and queries are ranked against it (with a "no match" threshold).
 
-This file gives working conventions and pitfalls for contributing.
+**Where things are:** [README.md](README.md) — current state and results. [ARCHITECTURE.md](ARCHITECTURE.md) —
+technical design. `TODO.md` — private task tracker. `.claude/plans/` — active implementation plans.
 
-## Why This Project Exists
+## How to work with this user
 
-This is a personal CV/portfolio project, built out of genuine interest in AI/ML, cybersecurity, and digital forensics/intelligence—not a client deliverable with a deadline. The point is to actually understand the material over the course of the project, not just have working code appear.
+This is a personal CV/learning project (AI/ML, security, forensics), not a client deliverable. The point is to
+understand the material, not just to have working code appear.
 
-**What this means in practice:**
+- Explain *why* alongside *what*: the reasoning behind an architecture choice, a metric or a caveat matters as much
+  as the code. Surface real tradeoffs instead of picking silently.
+- Work in small steps. At meaningful boundaries (a new file, a new concept, a design decision), stop and explain in
+  plain language what changed and why before moving on.
+- "Just get it done" or "you're on your own" overrides this for that task only.
+- Keep answers short and clear; lead with the answer. Tables and bullets when they help.
 
-- Explain *why* before or alongside implementing—the reasoning behind an architecture choice, a metric, a legal caveat, matters as much as the code itself.
-- Favor walking through non-obvious decisions over silently making them. If there's a tradeoff worth understanding (e.g., why triplet loss over softmax, why Rank-N over accuracy), surface it rather than picking silently.
-- It's fine to slow down for understanding, even where a faster path exists. Don't optimize for "task complete" over "concept understood."
-- When asked to build something, it's fair to also explain what was built and why, unless told otherwise for a specific exchange.
+## The critical invariant
 
-**Pacing — work in steps, not one big dump:**
+**Feature extraction must be identical in training and live use.** `features/extract.py` is the only place the
+HL/IL/PL/RL math and the M=50 windowing live:
+- dataset pipelines call `windows_from_keystrokes(pairs)` on (press, release) pairs;
+- the backend calls `extract_features(events)` on browser events (it pairs them, then calls the same function).
 
-- Break implementation into small, single-purpose steps rather than building an entire phase in one uninterrupted pass.
-- End each turn by explaining, in plain language, what changed and why—then stop. Treat that as a checkpoint, not a formality: leave room for questions before moving to the next step, don't plow straight into it unprompted.
-- This applies most at meaningful boundaries (a new file, a new concept, a real design decision)—small mechanical follow-ups within an already-explained step don't each need their own pause.
-- If asked to "just get it done" or similar for a specific exchange, that overrides this for that exchange only—it doesn't change the default.
+Never reimplement it (not in JS, not in a script). A mismatch degrades the model silently.
 
-## What This Project Is
+## Pitfalls that stay true
 
-An open-set 1:N gallery search system for keystroke biometrics. A network maps keystroke sequences to embeddings; the same person's typing clusters close, different people spread apart. New identities enroll later without retraining—enrollment and query are forward pass + ranking only.
+- **Split by subject, never by sample.** Eval subjects must never be seen in training.
+- **Rank-N / CMC for identification; FAR/FRR/EER only for verification.** Not classification accuracy.
+- **Always threshold the top score** ("no match"); never force a top-1 pick.
+- **No key identity in the input,** and anchor/positive from different sentences, or the model learns content.
+- **Masking:** padding sits at the end of a window; padded steps must not affect the embedding.
+- **25-keystroke floor** at enrollment and query (`MIN_KEYSTROKES`); reject shorter input.
+- **Not fixed-N classification:** people are gallery entries, never output classes.
 
-Capture protocol: random-prompt transcription (read-then-copy sentences), not free composition. This is a proxy task, with a known domain gap against freely composed text.
+## The live system — don't break it
 
-## The Critical Invariant
+The user runs the webapp from this working tree, so edits are live immediately.
+- The backend serves `model/encoder_hard.pt`. Don't overwrite or retrain into it; new models get new files.
+- `data/preprocessed/` + `data/split.json` are v1's training cache and split. Never rebuild or edit them
+  (`data/build_cache.py` writes straight into that folder).
+- `backend/gallery.db` holds the user's enrollments (private); `backend/gallery-populated.db` is the Aalto-only copy
+  that cloners get. Back up before touching either.
+- The user's dev servers run on :8000 (backend) and :5173 (frontend). **Never kill processes by port or image name;**
+  stop only PIDs you started. To test the backend yourself, run your own on another port.
 
-**Feature extraction must be identical between training and live query.**
+## Commands
 
-`features/extract.py` is the single canonical implementation of timing-vector extraction (HL/IL/PL/RL per keystroke). Both offline training and live `/enroll`/`/identify` endpoints must use this exact function—never reimplement it elsewhere (e.g., in JavaScript). Any divergence creates silent bugs: a model trained on slightly-different features degrades without error.
+Python work uses `.venv-model` (system Python has no torch).
 
-When extracting features for any dataset or demo, import and call `features.extract.extract_features()` directly. Route live browser events to a backend endpoint, not client-side processing.
+| Task | Command |
+|---|---|
+| Backend | `cd backend && ../.venv-model/Scripts/python -m uvicorn app.main:app --port 8000` |
+| Frontend | `cd frontend && npm run dev` (build: `npx vite build`) |
+| Tests | `.venv-model/Scripts/python -m unittest features.test_extract typenet.test_network typenet.test_losses` |
+| Evaluate a checkpoint | `.venv-model/Scripts/python -m comparison.evaluate --checkpoint <path>` |
 
-## Things to Get Right
+## Training runs
 
-- **Feature extraction drift.** The #1 risk. Use the canonical extractor everywhere.
-- **Wrong evaluation metric.** CMC curve and Rank-N accuracy are standard for identification search. Don't use classification metrics. Keep FAR/FRR/EER for verification mode only.
-- **Evaluating on the wrong split.** Hold out subjects during eval, not samples. Splitting by sample leaks identity information and silently inflates results.
-- **Forgetting "no match" case.** A real system thresholds the top similarity score rather than forcing a top-1 pick. Implement the threshold explicitly.
-- **Letting the network memorize content.** If key identity is in the input, or if anchor/positive pairs are from the same sentence often, the model learns sentence-specific timing rather than subject-specific rhythm. Evaluate on sentences the subject never typed during training.
-- **Padding/masking bugs.** Variable-length sequences padded to M=50 are new complexity. Make sure padded timesteps are actually masked in the LSTM, not just zero-valued input.
-- **Minimum sequence length.** Enforce a floor (~25–30 keystrokes) at enrollment and query. Reject or warn on shorter input; don't silently embed noise.
-- **Treating this as fixed-N classification.** Using enrolled people as output classes defeats the gallery-search approach and won't scale. The network has no notion of "identity"—only typing-rhythm similarity.
+- The GPU is a 4 GB laptop RTX A2000: **one training job at a time** (two at once thrash or crash).
+- Run anything longer than a few minutes in the background and watch its log for progress *and* failures.
+- Checkpoints and logs go in `runs/` (gitignored); never commit `*.pt` files.
 
-## Design Principles
+## Git
 
-- **Simplicity over speculation.** No features, abstractions, or error handling for impossible scenarios. Trust framework guarantees; validate only at edges (user input, external APIs).
-- **No feature flags or backwards-compatibility shims.** Change the code directly.
-- **Comments for WHY, not WHAT.** Only write when non-obvious: invariants, subtle bugs, workarounds.
-- **Single source of truth.** One feature extractor, one model inference path. Duplication creates drift.
+- Feature branches, merged to `main` by PR. Commit or push only when asked.
+- Never commit: `backend/gallery.db`, `backend/identify_log.jsonl`, `TODO.md`, `PRODUCT.md`, `FUTURE_PROSPECTS.md`,
+  `KNOWN_ISSUES.md`, `.claude/settings.local.json` (all gitignored — keep it that way).
 
-## Suggested Starting Points
+## Code style
 
-**Model training:**
-1. Download/reference Aalto 136M Keystrokes dataset.
-2. Implement `features/extract.py` if stubbed—timing-vector extraction with M=50 window.
-3. Implement training script: LSTM encoder, triplet loss, train on Aalto.
-4. Save weights to `/model`.
-
-**Wire the frontend:**
-1. Implement `/enroll` endpoint: extract features from browser events, embed, store gallery.
-2. Implement `/identify` endpoint: extract, embed, rank, return top-5.
-3. Connect frontend forms to these endpoints.
-
-**Evaluation:**
-1. Implement CMC curve and Rank-N accuracy scripts in `/eval`.
-2. Split Aalto by subject (disjoint train/eval identities).
-3. Report results as CMC plot and Rank-N table.
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for feature and model specifications.
+- Simplest thing that works; no speculative features, abstractions or error handling for impossible cases.
+- Comments explain *why* (invariants, subtle bugs, workarounds), not *what*.
+- One source of truth: one feature extractor, one inference path.
+- Match the surrounding code's style and naming.
