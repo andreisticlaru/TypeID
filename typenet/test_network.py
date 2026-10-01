@@ -1,5 +1,6 @@
 """run with: python -m unittest typenet.test_network -v"""
 
+import itertools
 import unittest
 
 import torch
@@ -63,6 +64,52 @@ class TypeNetEncoderTest(unittest.TestCase):
         buffers = sum(b.numel() for b in self.model.buffers())
         self.assertEqual(trainable, 199_944)
         self.assertEqual(trainable + buffers, 200_208)
+
+
+
+FLAGS = {"normalize": True, "readout": "mean", "batchnorm": False}  # each one's non-default value
+
+
+class AblationFlagsTest(unittest.TestCase):
+    def build(self, **flags):
+        torch.manual_seed(0)
+        return TypeNetEncoder(dropout=0.0, recurrent_dropout=0.0, **flags)
+
+    def test_each_flag_changes_the_output(self):
+        x, mask = batch(length=30)
+        baseline = self.build().eval()(x, mask)
+        for name, value in FLAGS.items():
+            with self.subTest(flag=name):
+                self.assertFalse(torch.allclose(self.build(**{name: value}).eval()(x, mask), baseline))
+
+    def test_padding_invariance_for_every_combination(self):
+        x, mask = batch(length=30)
+        mask[:3, 12:] = False  # mixed lengths, so the mean readout and BN statistics are exercised
+        x[~mask] = 0
+        noisy = x.clone()
+        noisy[~mask] = torch.rand(int((~mask).sum()), 4) * 1e4
+        for values in itertools.product([False, True], repeat=len(FLAGS)):
+            flags = {name: FLAGS[name] for name, on in zip(FLAGS, values) if on}
+            for mode in ("train", "eval"):
+                with self.subTest(flags=flags, mode=mode):
+                    model = getattr(self.build(**flags), mode)()
+                    torch.testing.assert_close(model(x, mask), model(noisy, mask))
+
+    def test_normalize_gives_unit_vectors(self):
+        x, mask = batch()
+        out = self.build(normalize=True).eval()(x, mask)
+        torch.testing.assert_close(out.norm(dim=1), torch.ones(len(out)))
+
+    def test_mean_readout_averages_real_steps(self):
+        model = self.build(readout="mean").eval()
+        x, mask = batch(n=2, length=10)
+        steps =model.lstm2(model.bn2(model.lstm1(model.bn1(x / model.input_scale, mask)), mask))
+        torch.testing.assert_close(model(x, mask), steps[:, :10].mean(1))
+
+    def test_no_batchnorm_removes_its_parameters(self):
+        model = self.build(batchnorm=False)
+        self.assertEqual(sum(p.numel() for p in model.parameters()), 199_944 - 8 - 256)
+        self.assertEqual(list(model.buffers()), [])
 
 
 if __name__ == "__main__":

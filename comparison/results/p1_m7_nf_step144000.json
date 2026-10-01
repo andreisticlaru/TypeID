@@ -1,0 +1,77 @@
+{
+  "checkpoint": "runs/p1_m7_nf/step144000.pt",
+  "arch": "v1",
+  "steps": 144000,
+  "batch_size": 64,
+  "triplets_seen": 9216000,
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "eval_split": "data/split_typenet.json",
+  "eval_cache": "data/preprocessed_typenet",
+  "train_cache": "C:/Users/andre/OneDrive/Personal Projects/typeid/data/preprocessed_typenet",
+  "typenet_protocol": {
+    "metric": "mean pairwise Euclidean distance, raw embeddings",
+    "eligible_people": 100593,
+    "rank1": [
+      79.26,
+      1.143
+    ],
+    "rank5": [
+      97.05,
+      0.378
+    ],
+    "rank20": [
+      99.55,
+      0.321
+    ],
+    "eer_g1": [
+      5.123,
+      0.253
+    ],
+    "eer_g2": [
+      2.932,
+      0.258
+    ],
+    "eer_g5": [
+      1.719,
+      0.146
+    ],
+    "eer_g7": [
+      1.47,
+      0.141
+    ],
+    "eer_g10": [
+      1.233,
+      0.114
+    ]
+  },
+  "strict": {
+    "metric": "cosine on averaged profile (backend rule), 3 enroll + 1 query",
+    "rank1": [
+      40.39,
+      0.984
+    ],
+    "rank5": [
+      71.5,
+      1.136
+    ],
+    "rank10": [
+      82.1,
+      0.516
+    ],
+    "rank20": [
+      90.22,
+      0.934
+    ]
+  }
+}

@@ -8,6 +8,10 @@
      predicts the live demo. It is not TypeNet's metric; TypeNet's raw embeddings were never trained for it.
 
 run with: python -m comparison.evaluate --checkpoint runs/pilot_old_split/typenet_a.pt --seeds 0 1 2 3 4 5 6 7 8 9
+TypeNet's split, no-floor cache:
+          python -m comparison.evaluate --split data/split_typenet.json --cache data/preprocessed_typenet --checkpoint runs/p1_m0_nf/final.pt
+Defaults are v1's split and cache, so earlier results reproduce. A checkpoint from typenet.train is saved as
+results/<run_id>_<file stem>.json (its files are all called final.pt / step<N>.pt).
 """
 
 from __future__ import annotations
@@ -20,7 +24,9 @@ import numpy as np
 import torch
 
 from comparison.loaders import load_any_encoder
-from eval.rank_n import RANKS_REPORTED, evaluate_model, load_eval_data, summarize
+from data.config import DATA_ROOT, PREPROCESSED_PATH
+from data_v2.datasets import load_eval_data
+from eval.rank_n import RANKS_REPORTED, evaluate_model, summarize
 from eval.typenet_protocol import ENROLLMENT_SIZES, authentication_eer, draw_background, identification_ranks, session_embeddings
 
 RESULTS_DIR = Path(__file__).parent / "results"
@@ -42,6 +48,7 @@ def typenet_protocol(model, data, device, seeds, background_size=1000) -> dict:
             eers[g].append(authentication_eer(background, g, rng))
     return {
         "metric": "mean pairwise Euclidean distance, raw embeddings",
+        "eligible_people": len(embeddings),
         **{f"rank{n}": mean_std([100 * (r <= n).mean() for r in ranks]) for n in (1, 5, 20)},
         **{f"eer_g{g}": mean_std(v) for g, v in eers.items()},
     }
@@ -59,10 +66,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", nargs="+", required=True)
     parser.add_argument("--seeds", type=int, nargs="+", default=list(range(10)))
+    parser.add_argument("--split", default=str(DATA_ROOT / "split.json"))
+    parser.add_argument("--cache", default=str(PREPROCESSED_PATH))
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    data = load_eval_data()
+    data = load_eval_data(args.split, args.cache)
     RESULTS_DIR.mkdir(exist_ok=True)
 
     print(f"{len(args.seeds)} seeds. TypeNet protocol: Rank-1 | EER% G=1/5/10.  Strict: Rank-1/5/10/20")
@@ -76,13 +85,17 @@ def main():
             "batch_size": config["batch_size"],
             "triplets_seen": config["steps"] * config["batch_size"],
             "seeds": args.seeds,
+            "eval_split": Path(args.split).as_posix(),
+            "eval_cache": Path(args.cache).as_posix(),
+            "train_cache": Path(config["cache"]).as_posix() if "cache" in config else "data/preprocessed",
             "typenet_protocol": typenet_protocol(model, data, device, args.seeds),
             "strict": strict_rank_n(model, data, device, args.seeds),
         }
-        json.dump(result, open(RESULTS_DIR / f"{path.stem}.json", "w"), indent=2)
+        name = f"{config['run_id']}_{path.stem}" if "run_id" in config else path.stem
+        json.dump(result, open(RESULTS_DIR / f"{name}.json", "w"), indent=2)
         t, s = result["typenet_protocol"], result["strict"]
-        print(f"{path.name:<34} {t['rank1'][0]:5.1f} | {t['eer_g1'][0]:.2f}/{t['eer_g5'][0]:.2f}/{t['eer_g10'][0]:.2f}"
-              f"   strict {s['rank1'][0]:5.1f}/{s['rank5'][0]:5.1f}/{s['rank10'][0]:5.1f}/{s['rank20'][0]:5.1f}", flush=True)
+        print(f"{name:<34} {t['rank1'][0]:5.1f} | {t['eer_g1'][0]:.2f}/{t['eer_g5'][0]:.2f}/{t['eer_g10'][0]:.2f}"
+              f"   strict {s['rank1'][0]:5.1f}/{s['rank5'][0]:5.1f}/{s['rank10'][0]:5.1f}/{s['rank20'][0]:5.1f}   eligible {t['eligible_people']}", flush=True)
 
 
 if __name__ == "__main__":

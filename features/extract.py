@@ -66,6 +66,8 @@ def pair_browser_events(events: list[dict[str, Any]]) -> list[tuple[float, float
 
 def windows_from_keystrokes(
     pairs: list[tuple[float, float]],
+    *,
+    min_keystrokes: int = MIN_KEYSTROKES,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Compute HL/IL/PL/RL timing features and window them to fixed length M.
 
@@ -79,6 +81,10 @@ def windows_from_keystrokes(
     pairs:
         ``(press_time_ms, release_time_ms)`` tuples, one per keystroke,
         sorted ascending by press time.
+    min_keystrokes:
+        Floor on timing vectors, for the session and for a trailing partial
+        window. The live app always uses the default; offline studies that
+        follow TypeNet's no-floor rule pass 1.
 
     Returns
     -------
@@ -95,10 +101,10 @@ def windows_from_keystrokes(
     standard practice in the keystroke-dynamics literature rather than
     inventing a value for an undefined boundary case.
     """
-    if len(pairs) < MIN_KEYSTROKES + 1:
+    if len(pairs) < min_keystrokes + 1:
         raise ValueError(
-            f"need at least {MIN_KEYSTROKES + 1} keystrokes to extract "
-            f"{MIN_KEYSTROKES} timing vectors, got {len(pairs)}"
+            f"need at least {min_keystrokes + 1} keystrokes to extract "
+            f"{min_keystrokes} timing vectors, got {len(pairs)}"
         )
 
     press = np.array([p for p, _ in pairs], dtype=np.float64)
@@ -125,7 +131,7 @@ def windows_from_keystrokes(
     # full M). If that remainder is too thin to trust, drop it rather than
     # feeding near-empty noise downstream -- the MIN_KEYSTROKES check above
     # only guarantees the *session* total, not each post-chunking window.
-    if mask[-1].sum() < MIN_KEYSTROKES:
+    if mask[-1].sum() < min_keystrokes:
         windows = windows[:-1]
         mask = mask[:-1]
 

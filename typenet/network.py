@@ -20,12 +20,17 @@ Masking: Keras' Masking layer makes the LSTM skip padded steps and return the ou
 step. Padding here is always at the end and the LSTM is unidirectional, so running over the padding
 and reading h at index (length - 1) gives exactly that. BatchNorm statistics are computed over real
 timesteps only, so the padded zeros can't shift the normalisation of real keystrokes.
+
+Ablation flags (defaults = the paper), each borrowed from our v1 encoder so one ingredient can be tested at a
+time: normalize=True L2-normalizes the output (for cosine distance); readout="mean" averages h over the real
+steps instead of taking the last one; batchnorm=False removes both MaskedBatchNorms.
 """
 
 from __future__ import annotations
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 INPUT_SIZE = 4
 HIDDEN_SIZE = 128
@@ -112,12 +117,19 @@ class TypeNetEncoder(nn.Module):
         dropout: float = DROPOUT,
         recurrent_dropout: float = RECURRENT_DROPOUT,
         input_scale: float = INPUT_SCALE,
+        normalize: bool = False,
+        readout: str = "last",
+        batchnorm: bool = True,
     ):
         super().__init__()
+        if readout not in ("last", "mean"):
+            raise ValueError(f"readout must be 'last' or 'mean', got {readout!r}")
         self.input_scale = input_scale
-        self.bn1 = MaskedBatchNorm(input_size)
+        self.normalize, self.readout, self.batchnorm = normalize, readout, batchnorm
+        # Created in this order so the default model draws the same initial weights as before the flags existed.
+        self.bn1 = MaskedBatchNorm(input_size) if batchnorm else None
         self.lstm1 = RecurrentDropoutLSTM(input_size, hidden_size, recurrent_dropout)
-        self.bn2 = MaskedBatchNorm(hidden_size)
+        self.bn2 = MaskedBatchNorm(hidden_size) if batchnorm else None
         self.dropout = nn.Dropout(dropout)
         self.lstm2 = RecurrentDropoutLSTM(hidden_size, hidden_size, recurrent_dropout)
 
@@ -127,9 +139,17 @@ class TypeNetEncoder(nn.Module):
         groups: see MaskedBatchNorm. Training passes anchor, positive and negative as one batch with
         groups=3; that's ~3x faster than three calls (the time-step loop dominates) and gives the same result.
         """
-        out = self.bn1(x / self.input_scale, mask, groups)
+        out = x / self.input_scale
+        if self.batchnorm:
+            out = self.bn1(out, mask, groups)
         out = self.lstm1(out)
-        out = self.dropout(self.bn2(out, mask, groups))
-        out = self.lstm2(out)
-        last = (mask.sum(1) - 1).clamp(min=0)
-        return out[torch.arange(len(out), device=out.device), last]
+        if self.batchnorm:
+            out = self.bn2(out, mask, groups)
+        out = self.lstm2(self.dropout(out))
+        if self.readout == "last":
+            last = (mask.sum(1) - 1).clamp(min=0)
+            out = out[torch.arange(len(out), device=out.device), last]
+        else:
+            m = mask.unsqueeze(-1).to(out.dtype)
+            out = (out * m).sum(1) / m.sum(1).clamp(min=1)
+        return F.normalize(out, dim=1) if self.normalize else out

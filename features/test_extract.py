@@ -96,6 +96,34 @@ class WindowsFromKeystrokesTests(unittest.TestCase):
         self.assertTrue((windows[1][~mask[1]] == 0).all())
 
 
+class MinKeystrokesTests(unittest.TestCase):
+    def test_default_matches_explicit_floor(self):
+        for n in (MIN_KEYSTROKES + 1, M + 1, M + 2, M + MIN_KEYSTROKES + 1, 3 * M + 7):
+            pairs = make_pairs(n)
+            default_windows, default_mask = windows_from_keystrokes(pairs)
+            explicit_windows, explicit_mask = windows_from_keystrokes(pairs, min_keystrokes=MIN_KEYSTROKES)
+            self.assertTrue((default_windows == explicit_windows).all())
+            self.assertTrue((default_mask == explicit_mask).all())
+
+    def test_default_still_rejects_short_session(self):
+        with self.assertRaises(ValueError):
+            windows_from_keystrokes(make_pairs(3))
+
+    def test_floor_of_one_accepts_short_session(self):
+        windows, mask = windows_from_keystrokes(make_pairs(3), min_keystrokes=1)
+        self.assertEqual(windows.shape, (1, M, 4))
+        self.assertEqual(mask.sum(), 2)
+
+    def test_floor_of_one_keeps_short_trailing_window(self):
+        windows, mask = windows_from_keystrokes(make_pairs(60), min_keystrokes=1)
+        self.assertEqual(windows.shape, (2, M, 4))
+        self.assertEqual(mask[1].sum(), 9)
+
+    def test_floor_of_one_rejects_single_keystroke(self):
+        with self.assertRaises(ValueError):
+            windows_from_keystrokes(make_pairs(1), min_keystrokes=1)
+
+
 class PairBrowserEventsTests(unittest.TestCase):
     def test_simple_sequential_pairs(self):
         events = [
