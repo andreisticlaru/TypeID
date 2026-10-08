@@ -56,8 +56,7 @@ is live in their app immediately.
 - **One GPU job at a time** (RTX A2000 laptop, 4 GB, shared with the user's backend). Two concurrent trainings
   thrashed memory (5 s/step) and one crashed with `CUDA error: an illegal memory access`. **User rule (2026-09-30):
   one GPU task at a time, evaluations included** — never run an evaluation next to a training.
-- Commit locally at the end of each phase (message ends with
-  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`). Never commit `*.pt`, caches, `gallery.db`,
+- Commit locally at the end of each phase (no co-author line, user rule 2026-10-08). Never commit `*.pt`, caches, `gallery.db`,
   `identify_log.jsonl`, `TODO.md` or `.claude/settings.local.json`.
 
 ---
@@ -482,41 +481,17 @@ and don't end a turn with a job running unless a watcher or background waiter wi
 
 ### Where to resume (handover)
 
-**Status (2026-10-08):** Step A and Step B runs R1, R1b, R2, R3, R5 are done and evaluated (results above, JSONs in
-`comparison/results/`). Queue empty, GPU idle. Committed and pushed on `feat/models-v2`. **v2 base = v1 net +
-semi-hard** (Step B decision above). README rewritten (identification + authentication; the TypeNet study is
-deliberately left out of it until Step C is done).
-
-**Next steps, in order** (one GPU job at a time; append to `runs/queue.txt`, launch `bash runs/queue.sh` with
-run_in_background, watch with `bash runs/watch.sh`; each training followed by its evals as in the R-runs' queue lines):
-1. **R4 — cheaper?** v1 net, semi-hard from step 0, 15.4M triplets (~2 h):
-   `typenet.train --run-id p1_r4_nf --arch v1 --batch-size 64 --steps 240000 --semi-from 0`.
-   Eval paper view (step96000, step168000, final) + `unseen_nf` / `unseen_f` (final). Compare with R1/R1b (82.1/82.3):
-   within 2 pts ⇒ the random warm-up is unnecessary and Step C uses `--semi-from 0`; worse ⇒ keep 40% random.
-2. **Commit** Step B (`feat: ablations under semi-hard mining`) once R4 is in.
-3. **Step C** (schedule from step 1 = "S"):
-   - `p3_v2_s2`: v2 at 15.4M, `--seed 2` (~2 h). R1 = seed 0 and R1b = seed 1 already are v2 at this budget
-     (if R4 changes the schedule, rerun seeds 0/1 with it instead). Report mean ± std over the 3 training seeds.
-   - `p3_v2long`: 500k × 64 = 32M triplets (v1's budget), schedule S scaled (40% random = `--semi-from 200000`, or 0),
-     `--save-every 50000` (~4–5 h). Evaluate every checkpoint on `unseen_nf`: when (if ever) does it pass v1's 89.1?
-   - `p3_v2long_hard`: `--resume runs/p3_v2long/final.pt --steps 600000 --hard-from 500000 --save-every 20000`
-     (+ same `--semi-from`) (~1–2 h). Watch HARD-START ratio and the COLLAPSED guard. v1 gained +7.5 from hardest.
-     First resume since the seed fix: check its first log lines differ from a fresh run's.
-   - `p3_v2_f`: the better of v2long / v2long_hard's recipe on the floor cache (`--cache data/preprocessed`).
-   - Evaluate all on paper view + `unseen_nf` + `unseen_f`; commit (`feat: v2 encoder`).
-4. **Step D:** final table, tests, README section on the TypeNet comparison (left out of README on the user's request until
-   Step C is done), webapp check.
-
-**Open questions for the write-up:**
-1. Our EER is ~1–2 pts behind the paper at equal Rank-1 (M0) — key code? (protocol ruled out, Q3)
-2. v1 net beats TN + mean readout by ~6 pts; the remaining differences (no BN, ms input, Linear head, dropout 0.2)
-   are not separated.
-3. v1's last 6.4 pts: hardest phase (+7.5 measured on v1), budget (32M) or 2.2× more training people? Step C's
-   v2-long / v2-long-hard answer the first two; the people count stays untested.
-
-**Environment:** pause Windows updates for long runs (an update reboot killed the queue once). GPU throttling comes
-and goes (0.18–0.69 s/step for TN b512; 0.02–0.06 for v1 net b64). `runs/queue.pending.old` (old M3–M6) is
-superseded.
+- **Done (2026-10-08):** Step A; Step B runs R1, R1b, R2, R3, R5 (trained + evaluated). v2 base = v1 net + semi-hard.
+  Committed and pushed (7bed2b5). Queue empty, GPU idle.
+- **Next:** R4 (v1 net, `--semi-from 0`), then Step C (v2 seed 2, v2-long at 32M, v2-long-hard, v2-f), then Step D.
+  Starts on the user's go-ahead.
+- **Open questions for the write-up:**
+  1. Our EER is ~1–2 pts behind the paper at equal Rank-1 (M0) — key code?
+  2. v1 net beats TN + mean readout by ~6 pts; the remaining differences (no BN, ms input, Linear head, dropout) are
+     not separated.
+  3. v1's last 6.4 pts: hardest phase, budget or 2.2× more training people? Step C answers the first two.
+- **Environment:** pause Windows updates for long runs. GPU throttling comes and goes. `runs/queue.pending.old` is
+  superseded.
 
 ### Results table (fill as runs finish)
 
