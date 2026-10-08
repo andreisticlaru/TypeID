@@ -1,5 +1,5 @@
 {
-  "checkpoint": "runs/p1_m2_nf/final.pt",
+  "checkpoint": "runs/p1_r3_nf/final.pt",
   "arch": "typenet",
   "steps": 30000,
   "batch_size": 512,
@@ -23,59 +23,59 @@
     "metric": "mean pairwise Euclidean distance, raw embeddings",
     "eligible_people": 100593,
     "rank1": [
-      69.0,
-      1.888
+      76.4,
+      1.238
     ],
     "rank5": [
-      91.77,
-      0.757
+      94.48,
+      0.471
     ],
     "rank20": [
-      98.39,
-      0.348
+      98.88,
+      0.391
     ],
     "rank50": [
-      99.58,
-      0.114
+      99.67,
+      0.149
     ],
     "eer_g1": [
-      7.433,
-      0.312
+      7.067,
+      0.376
     ],
     "eer_g2": [
-      5.274,
-      0.251
+      4.866,
+      0.252
     ],
     "eer_g5": [
-      3.565,
-      0.264
+      3.171,
+      0.194
     ],
     "eer_g7": [
-      3.078,
-      0.188
+      2.751,
+      0.16
     ],
     "eer_g10": [
-      2.687,
-      0.233
+      2.343,
+      0.19
     ]
   },
   "strict": {
     "metric": "cosine on averaged profile (backend rule), 3 enroll + 1 query",
     "rank1": [
-      29.12,
-      1.548
+      34.17,
+      1.543
     ],
     "rank5": [
-      56.67,
-      2.007
+      61.37,
+      1.305
     ],
     "rank10": [
-      68.64,
-      1.032
+      72.34,
+      1.122
     ],
     "rank20": [
-      79.67,
-      1.234
+      82.36,
+      0.863
     ]
   }
 }

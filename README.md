@@ -1,9 +1,9 @@
 <div align="center">
   <img src="image.png" alt="TypeID" width="200">
   
-  # TypeID: Keystroke Biometrics Identification
+  # TypeID: Keystroke Biometrics
   
-  *Open-set 1:N gallery search on typing rhythm*
+  *Open-set identification and authentication by typing rhythm*
 </div>
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://www.python.org/)
@@ -11,74 +11,57 @@
 [![CUDA](https://img.shields.io/badge/CUDA-12.4-green)](https://developer.nvidia.com/cuda-toolkit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A portfolio project exploring **open-set biometric identification from keystroke dynamics** — the typing-rhythm equivalent of a fingerprint or face-recognition search system. Given an unknown typing sample, identify the top-K most likely matches from a gallery of enrolled identities.
+A portfolio project on **biometric recognition from keystroke dynamics**: the typing-rhythm equivalent of a fingerprint or face-recognition system. It answers two questions:
 
-This is **not a classifier**. It's a 1:N gallery search built on a learned embedding space. A network is trained once, offline, on a public dataset to map keystroke sequences to vectors such that the same person's typing clusters together and different people's typing spreads apart. New people enroll later without retraining—enrollment and query are just a forward pass plus nearest-neighbor search.
+- **Identification (1:N), "who typed this?"** Rank an unknown sample against every enrolled person and return the top candidates, or **"no match"** when even the best score is too low. The gallery is open-set: the person typing may not be enrolled at all.
+- **Authentication (1:1), "is this really Alice?"** Compare a sample with one claimed person's profile and accept or reject it at a calibrated threshold.
 
-Subjects prove identity by **transcribing a random on-screen sentence** they've never seen before (not free composition, not a fixed password). The sentence varies every session, which rules out fixed-position features but forces the model to learn subject-specific rhythm rather than content-specific timing.
+This is **not a classifier**. A network is trained once, offline, on a public dataset to map keystroke timing to vectors (embeddings) so that the same person's typing lands close together and different people's typing lands far apart. People enroll later **without retraining**: enrollment, identification and authentication are a forward pass plus a distance comparison.
+
+Users prove identity by **transcribing a random on-screen sentence** they haven't seen before (not free composition, not a fixed password). The text changes every session, so the model has to learn the person's rhythm, not the timing of particular words.
 
 ## Results
 
+### The live model
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="eval/cmc_dark.svg">
-  <img alt="Cumulative match curve. The trained model places the correct person in the top 20 of 1,000 candidates 96.1% of the time, against 28.8% for an untrained network." src="eval/cmc_light.svg" width="100%">
+  <img alt="Cumulative match curve. The trained model places the correct person first among 1,000 candidates 56.9% of the time and in the top 50 98.8% of the time, against 44.3% in the top 50 for an untrained network." src="eval/cmc_light.svg" width="100%">
 </picture>
 
-A 500,000-step model (200k steps with random negatives, then 300k with **hard negative mining**) evaluated on **1,000 subjects held out of training entirely** — the split is by person, never by sample, so every identity here is one the network has never seen. Each is enrolled from 3 typing sessions and queried with a *different* sentence, so the model can't lean on what was typed. Figures are the mean ± standard deviation over 10 random draws of 1,000 subjects.
+The model the demo serves (`model/encoder_hard.pt`, a 217k-parameter two-layer LSTM) was trained for 500,000 steps: 200k with random negatives, 100k with semi-hard negative mining, then 200k with hardest-negative mining. Every test person was **held out of training entirely**: the split is by person, never by sample. Figures are the mean over 10 random draws of 1,000 people.
 
-| | Rank-1 | Rank-5 | Rank-10 | Rank-20 |
-|---|---|---|---|---|
-| **Hardest-negative model (500k steps)** | **56.9% ± 1.7** | 84.6% ± 1.4 | 91.9% ± 0.7 | 96.1% ± 0.6 |
-| Random-negative baseline (200k steps) | 28.4% ± 1.3 | 58.9% ± 1.4 | 72.2% ± 2.0 | 83.8% ± 1.0 |
-| Untrained network | 5.4% | 14.4% | 20.4% | 28.8% |
-| Chance | 0.1% | 0.5% | 1.0% | 2.0% |
+**How much typing you give it changes the accuracy a lot.** These numbers all come from the same model; only the amount of typing per person and the scoring rule differ:
 
-Read Rank-20 as: the correct person is among the top 20 of 1,000 candidates 96% of the time. The untrained row is the one that matters for calibration — raw timing features carry some signal even through a randomly initialized network, so that, not chance, is the honest floor.
+| Test | Enroll from | Query with | Rank-1 of 1,000 people |
+|---|---|---|---|
+| **Strict** (the graph above) | 3 sessions, averaged into one profile | **1** session | **56.9% ± 1.7** |
+| TypeNet's protocol, literally | 10 sequences, one 50-keystroke window each | 5 sequences, one window each | 89.8% |
+| 10 + 5 sessions, every window, pairwise distance | 10 sessions | 5 sessions | 93.3% |
+| 10 + 5 sessions, every window, averaged profile | 10 sessions | 5 sessions | 98.0% |
 
-**With more data per person.** The test above is deliberately strict: one short query per person. The [TypeNet paper](https://arxiv.org/abs/2101.05570) reports identification with 10 enrollment and 5 query sequences per person, scored by mean pairwise distance, and gets 67.4% Rank-1 for its triplet model on a 1,000-person gallery. Under that same protocol:
+Rank-1 means the right person came out on top. Rank-N means they were among the top N; the graph's right end (98.8%) is Rank-50 of the strict test. Strict test Rank-5 / 10 / 20: 84.6% / 91.9% / 96.1%, against 14.4% / 20.4% / 28.8% for an untrained network and 0.5% / 1.0% / 2.0% for chance.
 
-| Rank-1, 1,000 people, 10 enroll + 5 query sessions | Pairwise distance (TypeNet's rule) | Averaged profile |
-|---|---|---|
-| Random-negative baseline (200k) | 65.2% | 82.4% |
-| **Hardest-negative model (500k)** | **93.3%** | **98.0%** |
+Those figures hold out a random 10% of people and require at least 25 keystrokes per window. "TypeNet's protocol" is the identification test of the [TypeNet paper](https://arxiv.org/abs/2101.05570) (Acien et al., 2021), the reference deep model for this dataset.
 
-Those two columns sample 15 random sessions per person and pool every window of a session, so they are a little friendlier than the paper. `eval/typenet_protocol.py` follows the paper literally: each person's first 15 sequences in time order, first 10 as gallery and last 5 as query, **one 50-keystroke window per sequence**, mean pairwise distance, and EER for authentication (per person, then averaged). Ten random draws of 1,000 held-out people:
+### How the live model got here
+
+Accuracy plateaued at 28% (strict test) after about 90k steps of random negatives, and a diagnostic showed why: 78% of random training triplets already satisfied the loss margin and contributed no gradient. Replacing each random negative with a harder one from the same batch raised Rank-1 to 51.7% (semi-hard). Taking the closest negative regardless (hardest) raised it to 56.9% at equal compute. A control that just trained 100k more steps with random negatives gained 0.8 points, so the improvement comes from which negatives are used, not from training longer. Under TypeNet's protocol on this project's split:
 
 | Model | Rank-1 (1,000 people) | EER at 1 / 5 / 10 enrollment sequences |
 |---|---|---|
-| TypeNet, published (triplet, desktop, key code as input) | 67.4% | 5.4 / 2.2 / 1.6 |
-| Random-negative baseline (200k) | 60.5% | 5.43 / 2.57 / 2.01 |
-| Random-negative control (300k) | 61.8% | 5.35 / 2.56 / 1.97 |
+| Random negatives (200k steps) | 60.5% | 5.43 / 2.57 / 2.01 |
+| Random negatives (300k, control) | 61.8% | 5.35 / 2.56 / 1.97 |
 | Semi-hard mining (300k) | 82.1% | 4.09 / 1.34 / 0.90 |
 | Semi-hard mining (500k) | 85.2% | 3.48 / 1.04 / 0.73 |
-| **Hardest-negative (500k)** | **89.8%** | **3.01 / 0.81 / 0.55** |
+| **Hardest-negative (500k), the live model** | **89.8%** | **3.01 / 0.81 / 0.55** |
 | Untrained network | 11.2% | 24.98 / 20.48 / 19.29 |
 
-The random-negative baseline lands on TypeNet's published one-sequence EER (5.43% vs 5.4%), which is the check that this evaluation is like-for-like; it sits below their Rank-1, consistent with this model not seeing the key code. Mining is what moves it past the paper. Caveats: TypeNet tests on 100,000 people and this test can only use the 3,771 held-out people with 15 sessions above the 25-keystroke floor, so its galleries overlap across draws; giving the hardest-negative model a gallery of all 3,771 lowers Rank-1 from 89.8% to 79.0%. The same model scores 90.2% on people it *trained* on, so there is no memorization gap. Averaging a person's enrollment embeddings into one profile beats averaging pairwise distances, which is what the backend's pooling does.
+On this split only 3,771 held-out people have 15 sessions above the 25-keystroke floor, so galleries overlap across draws. With a gallery of all 3,771, Rank-1 drops from 89.8% to 79.0%. The model scores 90.2% on people it *trained* on, so there is no memorization gap.
 
-**TypeNet retrained on this project's data.** The published comparison mixes architecture, recipe, subjects and TypeNet's key-code input. To separate them, TypeNet was rebuilt in PyTorch ([typenet/](typenet/)): two LSTM(128) layers with BatchNorm, dropout 0.5 and recurrent dropout 0.2 in between, squared-Euclidean triplet loss with margin 1.5, 512 triplets per batch and 30,000 steps (the paper's 200 × 150 batches). It was trained on the same split and windows as the model above, with **timing features only**. The parameter count matches the paper's 200,458 once its key-code input is removed. Same protocol and 10 draws as the table above ([comparison/evaluate.py](comparison/evaluate.py)):
+### The live demo: how many prompts to type
 
-| Model | Triplets seen | Rank-1 (1,000 people) | EER at 1 / 5 / 10 |
-|---|---|---|---|
-| TypeNet, published (key code as input) | 15.4M | 67.4% | 5.4 / 2.2 / 1.6 |
-| TypeNet, paper recipe (Adam lr 0.05) | 15.4M | 1.0% (collapsed) | 36.8 / 33.0 / 31.8 |
-| TypeNet, lr 1e-3 | 15.4M | 68.3% | 6.78 / 3.08 / 2.28 |
-| TypeNet, lr 1e-3, semi-hard mining after 10k steps | 15.4M | 74.2% | 6.11 / 2.56 / 1.85 |
-| TypeNet, hardest-negative mining | 15.4M | 0.5% (collapsed) | 25.1 / 19.1 / 17.1 |
-| This project, random negatives (200k) | 12.8M | 60.5% | 5.43 / 2.57 / 2.01 |
-| This project, hardest-negative (500k) | 32.0M | 89.8% | 3.01 / 0.81 / 0.55 |
-
-What each row shows:
-- **The published learning rate doesn't transfer.** At lr 0.05 the loss spikes within 400 steps and the network settles on nearly identical embeddings for everyone. At lr 1e-3 the same network reaches the paper's Rank-1 (68.3% vs 67.4%) without the key code, though its EER stays about 1.3 points higher at one enrollment sequence.
-- **Architecture, same recipe.** With random negatives and similar compute (15.4M vs 12.8M triplets), TypeNet's architecture beats this project's (68.3% vs 60.5%).
-- **Mining helps TypeNet too, but less.** Semi-hard mining adds 6 points to TypeNet. Hardest-negative mining collapsed it twice, once started at 10k steps and once from the semi-hard model at 20k: the loss pinned at the margin and every input mapped to the same point.
-- **Why that collapse happens here and not in this project's model is untested.** Three candidates: unnormalized embeddings under squared Euclidean distance, where shrinking everything is an easy exit; the larger batch, whose hardest negative out of 1,024 is more often a near-duplicate typist; or starting too early.
-
-Each row is a single training seed, so gaps of a few points are not established.
-
-**How it got here.** Accuracy plateaued at 28% after roughly 90k steps of random negatives, and a diagnostic showed why: 78% of randomly drawn training triplets already satisfied the loss margin and contributed no gradient. Replacing each random negative with a harder one from the same batch raised Rank-1 to 51.7% (semi-hard), and taking the closest negative regardless (hardest) to 56.9% at equal compute. A control that simply trained 100k more steps with random negatives gained 0.8 points, so the improvement comes from which negatives are used, not from training longer. The hardest-negative curve is now flattening.
-
-**How many prompts to type.** The demo lets you enroll, identify and authenticate from 1, 5 or 10 prompts, so each combination needs its own decision threshold. `eval/calibrate_auth.py` sets **one threshold per combination, fixed in advance for everyone**, which is what a deployed system has to do. That is stricter than the per-person EER above, which picks the best threshold for each person after seeing their scores. That's why 5 enrollment prompts give 1.97% here but 0.81% there. Each cell is the equal error rate at the threshold the backend uses, over 1,000 held-out people:
+The demo lets you enroll, identify and authenticate from 1, 5 or 10 prompts, so each combination needs its own decision threshold. `eval/calibrate_auth.py` sets **one threshold per combination, fixed in advance for everyone**, which is what a deployed system has to do. That is stricter than the per-person EER above, which picks the best threshold for each person after seeing their scores. That's why 5 enrollment prompts give 1.97% here but 0.81% there. Each cell is the equal error rate at the threshold the backend uses, over 1,000 held-out people:
 
 | Authentication, enroll ↓ / query → | 1 prompt | 5 prompts | 10 prompts |
 |---|---|---|---|
@@ -111,7 +94,11 @@ The demo defaults to 5 / 1 / 1. Identify stays at 1 on purpose, for speed, and t
 
 Caveats: Aalto has at most 15 sessions per person, so 10 + 10 can't be measured without reusing enrollment sessions as queries; the backend borrows the 10 + 5 threshold and says so. The 0.12% cells rest on about 1,000 genuine scores, so they can't be told apart from 0.29% with confidence. The identification thresholds assume a gallery enrolled from 5 prompts, which the Aalto background makes true for most of it.
 
-Reproduce with `python -m eval.rank_n --seeds 0 1 2 3 4 5 6 7 8 9` (add `--enroll-sessions 10 --probe-sessions 5 --score pairwise` for the random-session TypeNet-style variant, or run `python -m eval.typenet_protocol --checkpoint model/encoder_hard.pt --seeds 0 1 2 3 4 5 6 7 8 9` for the strict one; `python -m eval.calibrate_auth --checkpoint model/encoder_hard.pt` for the prompt-count thresholds), or open [`eval/dashboard.html`](eval/dashboard.html) for the full project timeline and per-checkpoint curves.
+### Reproduce
+
+- Strict test and its variants: `python -m eval.rank_n --seeds 0 1 2 3 4 5 6 7 8 9` (add `--enroll-sessions 10 --probe-sessions 5 --score pairwise` for the 10 + 5 variant).
+- TypeNet's protocol on this project's split: `python -m eval.typenet_protocol --checkpoint model/encoder_hard.pt --seeds 0 1 2 3 4 5 6 7 8 9`.
+- Prompt-count thresholds: `python -m eval.calibrate_auth --checkpoint model/encoder_hard.pt`. The full early-project timeline is in [`eval/dashboard.html`](eval/dashboard.html).
 
 ## Why This Framing Matters
 
@@ -119,7 +106,7 @@ Keystroke biometrics is not a solved problem—particularly the generalization g
 
 ## Try it out
 
-Enroll, then identify against the live gallery — from a phone or a second device works too, as
+Enroll, then identify yourself against the live gallery or authenticate as an enrolled person — from a phone or a second device works too, as
 long as it can reach the backend on your local network.
 
 **Backend** (FastAPI, from `backend/`):
@@ -143,18 +130,18 @@ Serves on `http://localhost:5173`, CORS-allowed against the backend above.
 | Piece | Target (per [ARCHITECTURE.md](ARCHITECTURE.md)) | Current state |
 |---|---|---|
 | Feature extraction (`features/extract.py`) | Canonical HL/IL/PL/RL timing-vector extractor, shared byte-for-byte by training and live capture | **Done** — single implementation used by both paths, 12 unit tests, 25-keystroke floor enforced per window |
-| Model (`/model`) | 2-layer LSTM triplet-loss embedding network, trained on Aalto | **Done** — 217k-parameter encoder trained 500k steps with hard negative mining; 56.9% Rank-1 on held-out subjects (see [Results](#results)) |
+| Model (`/model`) | 2-layer LSTM triplet-loss embedding network, trained on Aalto | **Done** — 217k-parameter encoder trained 500k steps ending in hardest-negative mining; 89.8% Rank-1 under TypeNet's protocol, 56.9% on the strict 1-query test (see [Results](#results)) |
 | Embedding function (`backend/app/embedding.py`) | Frozen `f(features) -> 128-dim embedding` | **Done** — loads the trained checkpoint, pools multi-window sessions, re-normalizes |
 | Gallery store (`backend/app/gallery.py`) | SQLite table of `{person_id, name, embedding, enrolled_at}` | **Done** — also stores `enroll_prompts`, since thresholds depend on it |
-| `/enroll`, `/identify` endpoints | Full extract → embed → pool/rank flow | **Done** — both reachable and wired to the trained model |
+| `/enroll`, `/identify`, `/authenticate` endpoints | Full extract → embed → pool/rank flow | **Done** — wired to the trained model; identification and authentication thresholds calibrated per prompt count |
 | Embedding map (`GET /map`) | Interactive view of the gallery embedding space | **Done** — seeded Aalto background plus enrolled points |
-| Frontend capture UI | Prompt display, capture, submit to backend, render top-5 results | **Done** — enroll and identify flows are wired to the backend, reachable from a phone |
-| Evaluation (`/eval`) | CMC curve, Rank-N accuracy | **Done** — multi-seed Rank-N/CMC over held-out subjects, plus an HTML progress dashboard |
+| Frontend capture UI | Prompt display, capture, submit to backend, render top-5 results | **Done** — enroll, identify and authenticate flows wired to the backend, reachable from a phone |
+| Evaluation (`/eval`, `/comparison`) | CMC curve, Rank-N accuracy | **Done** — multi-seed Rank-N/CMC, TypeNet's protocol (Rank-N + per-person EER), any checkpoint on any split |
 | Data (`/data`) | Cached preprocessed Aalto sequences | **Done** — 2.48M windows from 168,593 participants, cached as `.npy`; subject-disjoint split saved to `split.json` |
 
 In short: the **system works end to end** — canonical feature extraction, a trained embedding
-model, a live gallery reachable through `/enroll` and `/identify`, and a held-out evaluation that
-says how well it performs. The open questions from here are free-text composition, explainability,
+model, a live gallery reachable through `/enroll`, `/identify` and `/authenticate`, and a held-out
+evaluation that says how well it performs. The open questions from here are free-text composition, explainability,
 and data protection.
 
 ## How It Works
@@ -163,10 +150,11 @@ and data protection.
 
 **Model:** 2-layer LSTM encoder trained on triplet loss. Anchor and positive pairs are two different sessions from the same person (different transcribed text each time). Negatives are sessions from different people. The triplet loss pushes same-person embeddings close and different-people embeddings far.
 
-**Training → Enrollment → Identification:**
+**Training → Enrollment → Identification / Authentication:**
 1. Train the LSTM once on the [Aalto 136M Keystrokes dataset](https://userinterfaces.aalto.fi/136Mkeystrokes/) (public, 168,000 subjects, ~15 transcribed sentences each). Output: frozen embedding function `f()`.
 2. User enrolls: transcribes 1, 5 or 10 random prompts (default 5). Backend extracts timing features, runs each through `f()`, averages them into one profile, and stores it with the name and prompt count in the gallery.
-3. Unknown sample arrives. Extract timing, embed with `f()`, rank gallery by cosine similarity, return top-5 candidates.
+3. **Identify:** an unknown sample arrives. Extract timing, embed with `f()`, rank the gallery by cosine similarity, return the top-5 candidates, or "no match" if the best score is below the calibrated threshold.
+4. **Authenticate:** a sample plus a claimed name. Embed it, compare with that one profile, accept or reject at the threshold calibrated for the prompt counts used.
 
 **Critical invariant:** `features/extract.py` is the single canonical feature extractor used by both training and live endpoints. Any divergence between training features and query features introduces silent bugs—a model trained on slightly-different features degrades without error. See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed feature and model specs.
 
@@ -176,11 +164,12 @@ and data protection.
 /data/        Aalto loader, cache builder, subject-disjoint split (preprocessed arrays gitignored)
 /features/    canonical feature-extraction module + unit tests
 /model/       LSTM encoder, triplet loss, triplet sampler, training script (weights gitignored)
-/eval/        Rank-N / CMC evaluation, progress dashboard
-/typenet/     TypeNet rebuilt in PyTorch (timing features only): network, loss + mining, training, tests
-/comparison/  evaluates checkpoints of any architecture under both protocols
-/backend/     FastAPI app: gallery store, /enroll, /identify, /map — all wired to the trained model
-/frontend/    Vite + Tailwind capture UI, wired to the backend for enroll/identify
+/data_v2/     TypeNet's split, TypeNet's data rule cache, loaders for any (split, cache)
+/eval/        Rank-N / CMC evaluation, TypeNet's protocol, threshold calibration, progress dashboard
+/typenet/     TypeNet rebuilt in PyTorch (timing features only) with ablation flags; trains either network on any split
+/comparison/  evaluates checkpoints of any architecture under both protocols; results/ holds every score
+/backend/     FastAPI app: gallery store, /enroll, /identify, /authenticate, /map — all wired to the trained model
+/frontend/    Vite + Tailwind capture UI, wired to the backend for enroll/identify/authenticate
 
 ARCHITECTURE.md  Full technical design: data specs, model, evaluation metrics
 CLAUDE.md        Contribution guidelines and working conventions

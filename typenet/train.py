@@ -135,6 +135,8 @@ def main():
     start_step = 0
     if args.resume:
         start_step = load_for_resume(args.resume, model, optimizer, device)
+        # Reseeding with --seed alone would replay the triplet draws of steps 1..start_step (seen in R1).
+        np.random.seed(args.seed + start_step)
         print(f"Resuming from {args.resume} at step {start_step}", flush=True)
 
     config = {

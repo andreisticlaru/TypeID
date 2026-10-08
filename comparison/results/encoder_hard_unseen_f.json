@@ -1,0 +1,81 @@
+{
+  "checkpoint": "model/encoder_hard.pt",
+  "arch": "v1",
+  "steps": 500000,
+  "batch_size": 64,
+  "triplets_seen": 32000000,
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "eval_split": "data/split_unseen_both.json",
+  "eval_cache": "data/preprocessed",
+  "train_cache": "data/preprocessed",
+  "typenet_protocol": {
+    "metric": "mean pairwise Euclidean distance, raw embeddings",
+    "eligible_people": 2238,
+    "rank1": [
+      89.0,
+      0.901
+    ],
+    "rank5": [
+      99.3,
+      0.211
+    ],
+    "rank20": [
+      99.95,
+      0.071
+    ],
+    "rank50": [
+      100.0,
+      0.0
+    ],
+    "eer_g1": [
+      3.148,
+      0.155
+    ],
+    "eer_g2": [
+      1.643,
+      0.076
+    ],
+    "eer_g5": [
+      0.865,
+      0.039
+    ],
+    "eer_g7": [
+      0.684,
+      0.041
+    ],
+    "eer_g10": [
+      0.557,
+      0.036
+    ]
+  },
+  "strict": {
+    "metric": "cosine on averaged profile (backend rule), 3 enroll + 1 query",
+    "rank1": [
+      56.27,
+      1.504
+    ],
+    "rank5": [
+      83.78,
+      1.05
+    ],
+    "rank10": [
+      90.76,
+      0.701
+    ],
+    "rank20": [
+      95.76,
+      0.508
+    ]
+  }
+}

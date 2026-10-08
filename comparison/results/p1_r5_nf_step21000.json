@@ -1,9 +1,9 @@
 {
-  "checkpoint": "runs/p1_m2_nf/final.pt",
+  "checkpoint": "runs/p1_r5_nf/step21000.pt",
   "arch": "typenet",
-  "steps": 30000,
+  "steps": 21000,
   "batch_size": 512,
-  "triplets_seen": 15360000,
+  "triplets_seen": 10752000,
   "seeds": [
     0,
     1,
@@ -23,59 +23,59 @@
     "metric": "mean pairwise Euclidean distance, raw embeddings",
     "eligible_people": 100593,
     "rank1": [
-      69.0,
-      1.888
+      67.72,
+      1.266
     ],
     "rank5": [
-      91.77,
-      0.757
+      90.96,
+      0.66
     ],
     "rank20": [
-      98.39,
-      0.348
+      98.31,
+      0.507
     ],
     "rank50": [
-      99.58,
-      0.114
+      99.68,
+      0.103
     ],
     "eer_g1": [
-      7.433,
-      0.312
+      7.268,
+      0.393
     ],
     "eer_g2": [
-      5.274,
-      0.251
+      5.009,
+      0.318
     ],
     "eer_g5": [
-      3.565,
-      0.264
+      3.317,
+      0.213
     ],
     "eer_g7": [
-      3.078,
-      0.188
+      2.871,
+      0.16
     ],
     "eer_g10": [
-      2.687,
-      0.233
+      2.475,
+      0.13
     ]
   },
   "strict": {
     "metric": "cosine on averaged profile (backend rule), 3 enroll + 1 query",
     "rank1": [
-      29.12,
-      1.548
+      31.44,
+      1.558
     ],
     "rank5": [
-      56.67,
-      2.007
+      58.9,
+      1.399
     ],
     "rank10": [
-      68.64,
-      1.032
+      70.58,
+      1.258
     ],
     "rank20": [
-      79.67,
-      1.234
+      80.99,
+      1.154
     ]
   }
 }

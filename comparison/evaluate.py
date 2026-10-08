@@ -11,7 +11,8 @@ run with: python -m comparison.evaluate --checkpoint runs/pilot_old_split/typene
 TypeNet's split, no-floor cache:
           python -m comparison.evaluate --split data/split_typenet.json --cache data/preprocessed_typenet --checkpoint runs/p1_m0_nf/final.pt
 Defaults are v1's split and cache, so earlier results reproduce. A checkpoint from typenet.train is saved as
-results/<run_id>_<file stem>.json (its files are all called final.pt / step<N>.pt).
+results/<run_id>_<file stem>.json (its files are all called final.pt / step<N>.pt). --tag appends _<tag>, so
+scoring the same checkpoint on another test set (e.g. data/split_unseen_both.json) never overwrites a result.
 """
 
 from __future__ import annotations
@@ -49,7 +50,7 @@ def typenet_protocol(model, data, device, seeds, background_size=1000) -> dict:
     return {
         "metric": "mean pairwise Euclidean distance, raw embeddings",
         "eligible_people": len(embeddings),
-        **{f"rank{n}": mean_std([100 * (r <= n).mean() for r in ranks]) for n in (1, 5, 20)},
+        **{f"rank{n}": mean_std([100 * (r <= n).mean() for r in ranks]) for n in (1, 5, 20, 50)},
         **{f"eer_g{g}": mean_std(v) for g, v in eers.items()},
     }
 
@@ -68,13 +69,14 @@ def main():
     parser.add_argument("--seeds", type=int, nargs="+", default=list(range(10)))
     parser.add_argument("--split", default=str(DATA_ROOT / "split.json"))
     parser.add_argument("--cache", default=str(PREPROCESSED_PATH))
+    parser.add_argument("--tag", default=None, help="suffix for the result file name")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     data = load_eval_data(args.split, args.cache)
     RESULTS_DIR.mkdir(exist_ok=True)
 
-    print(f"{len(args.seeds)} seeds. TypeNet protocol: Rank-1 | EER% G=1/5/10.  Strict: Rank-1/5/10/20")
+    print(f"{len(args.seeds)} seeds. TypeNet protocol: Rank-1 (Rank-50) | EER% G=1/5/10.  Strict: Rank-1/5/10/20")
     for path in map(Path, args.checkpoint):
         config = torch.load(path, map_location="cpu")["config"]
         model = load_any_encoder(path, device)
@@ -92,9 +94,10 @@ def main():
             "strict": strict_rank_n(model, data, device, args.seeds),
         }
         name = f"{config['run_id']}_{path.stem}" if "run_id" in config else path.stem
+        name = f"{name}_{args.tag}" if args.tag else name
         json.dump(result, open(RESULTS_DIR / f"{name}.json", "w"), indent=2)
         t, s = result["typenet_protocol"], result["strict"]
-        print(f"{name:<34} {t['rank1'][0]:5.1f} | {t['eer_g1'][0]:.2f}/{t['eer_g5'][0]:.2f}/{t['eer_g10'][0]:.2f}"
+        print(f"{name:<34} {t['rank1'][0]:5.1f} (R50 {t['rank50'][0]:5.1f}) | {t['eer_g1'][0]:.2f}/{t['eer_g5'][0]:.2f}/{t['eer_g10'][0]:.2f}"
               f"   strict {s['rank1'][0]:5.1f}/{s['rank5'][0]:5.1f}/{s['rank10'][0]:5.1f}/{s['rank20'][0]:5.1f}   eligible {t['eligible_people']}", flush=True)
 
 
