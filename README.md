@@ -59,6 +59,38 @@ Accuracy plateaued at 28% (strict test) after about 90k steps of random negative
 
 On this split only 3,771 held-out people have 15 sessions above the 25-keystroke floor, so galleries overlap across draws. With a gallery of all 3,771, Rank-1 drops from 89.8% to 79.0%. The model scores 90.2% on people it *trained* on, so there is no memorization gap.
 
+### A controlled model study on TypeNet's own split
+
+To see which ingredients matter, new models were trained on **TypeNet's split and data rule** (first 68,000 people train, the other 100,593 test; one 50-keystroke window per session, no floor) and scored with its identification protocol (1,000 people, 10 enrollment sequences, 5 queries, mean pairwise distance). The only remaining difference from the paper is its key-code input, which can only help TypeNet. Every model has the same 15.4M-triplet budget unless noted, and the live model is scored on the 10,001 people neither it nor any new model trained on.
+
+| Model | What changed | Rank-1 (paper view) | EER at G=1 | Rank-1, 10,001 unseen people |
+|---|---|---|---|---|
+| TypeNet, as published | key code, random negatives | 67.4% | 5.4 | n/a |
+| TypeNet rebuilt, random negatives | timing only | 66.7% | 7.31 | 66.7% |
+| + semi-hard mining | | 71.8% | 6.88 | 72.2% |
+| + mean readout and semi-hard | | 76.4% | 7.07 | 76.1% |
+| Live model's network, semi-hard | no BatchNorm, ms input, Linear head | **82.2%** (3 seeds, ±0.1) | **4.5** | **82.5%** (±0.2) |
+| + 32M triplets | doubled budget | 83.3% | 4.23 | 83.7% |
+| + hardest-negative phase (38.4M) | 100k steps on top | **87.5%** | **3.64** | **87.5%** |
+| Live model | 152k people, 32M triplets | n/a | n/a | 89.1% |
+
+What it shows:
+- **Semi-hard mining is the biggest lever** (+5 points for TypeNet's network, +10 for the live model's). Hardest mining only works after a long semi-hard phase: tried early, it collapsed every embedding (12.5%).
+- **The live model's network beats TypeNet's by ~6 points** at equal budget and mining. Which of its differences does it (no BatchNorm, input scale, head, dropout) was not separated.
+- **The live model's last 1.6 points** probably come from its 2.2x more training people (152k vs 68k); this was not tested.
+- Training seed noise is 0.1 to 0.2 points, so differences under 2 points are not claimed as wins.
+
+**Is a new model better than the live one?** The ± over random draws cannot answer that (the draws overlap), so models are compared on the same people: every unseen person is scored once per repetition, and the per-person difference gets a bootstrap interval over people (`comparison/paired.py`). Best new model (v2 with the floor cache and a hardest-negative phase) against the live model:
+
+| Test set | Rank-1, live / new | Difference (95% interval) | EER at 1 sequence, live / new |
+|---|---|---|---|
+| 10,001 unseen people, no floor | 88.5 / 87.9 | −0.56 [−0.86, −0.27] | 3.69 / 3.69 |
+| 2,238 unseen people, 25-keystroke floor | 89.5 / 89.1 | −0.38 [−1.12, +0.37], inconclusive | 3.12 / 3.10 |
+
+So the new model ties the live one on error rate and is within a point on Rank-1; it is not better, and the live model was trained on 2.2x more people. Against the TypeNet rebuild on TypeNet's full test set (100,593 people), the new model is +21.7 Rank-1 points [+21.4, +22.0].
+
+First lesson from the pilot, kept for the record: TypeNet's published learning rate (0.05) destroyed the network in this implementation (1.0% Rank-1), so every run uses 1e-3.
+
 ### The live demo: how many prompts to type
 
 The demo lets you enroll, identify and authenticate from 1, 5 or 10 prompts, so each combination needs its own decision threshold. `eval/calibrate_auth.py` sets **one threshold per combination, fixed in advance for everyone**, which is what a deployed system has to do. That is stricter than the per-person EER above, which picks the best threshold for each person after seeing their scores. That's why 5 enrollment prompts give 1.97% here but 0.81% there. Each cell is the equal error rate at the threshold the backend uses, over 1,000 held-out people:
