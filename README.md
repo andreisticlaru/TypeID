@@ -9,7 +9,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.6-red)](https://pytorch.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.4-green)](https://developer.nvidia.com/cuda-toolkit)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 
 A portfolio project on **biometric recognition from keystroke dynamics**: the typing-rhythm equivalent of a fingerprint or face-recognition system. It answers two questions:
 
@@ -222,3 +222,11 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed feature extraction, model ar
 
 **Applications and extensions:**
 - Park, J., Park, Y., & Jang, B. (2024). [LLM-Assisted Cheating Detection in Korean Language via Keystrokes](https://arxiv.org/html/2507.22956v1). *arXiv*. — Real-world application of keystroke dynamics to detect exam fraud; shows how timing features generalize across languages and high-cognitive-load scenarios.
+
+## License and data
+
+Copyright (C) 2026 Andrei Sticlaru. The code is released under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0): you may use, modify and share it, but if you distribute a modified version or run one as a network service, you must publish its source code under the same license.
+
+The license covers the code only, not the data it was trained and evaluated on:
+
+- **Aalto 136M Keystrokes:** the models are trained on this dataset, and files derived from it, such as `backend/gallery-populated.db` (500 held-out Aalto participants), fall under its own terms of use. See the [dataset page](https://userinterfaces.aalto.fi/136Mkeystrokes/) and cite Dhakal et al. (2018) (see [References](#references)) when using them.
