@@ -87,6 +87,9 @@ KVC-style EER, 5 enrollment sequences; k = sequences averaged per query (score l
 2. Then 4–5, the research part, ideally once KVC data arrives (bigger, cleaner training pool).
 3. 6 when Buffalo answers; keep Buffalo as the untouched final test if possible.
 
+Update (2026-10-27): lever 4 is deprioritised (Type2Branch / EERLoss lead the architecture race; nothing in the
+recipe moved cross-session). Levers 6–7 and the free-text question continue in `shift-plan.md`.
+
 ## Rules for this plan
 
 - Score every candidate on both yardsticks: same-session (Aalto / KVC) and cross-session (KeyRecs `kvc_cross`).

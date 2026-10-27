@@ -1,5 +1,7 @@
 # Paper plan: one transcription-trained embedding, three decisions, three shifts
 
+Short actionable version: `shift-plan.md`. This file keeps the literature and the reasoning.
+
 Status (2026-10-27): proposal, nothing started. Built on a literature sweep done the same day (sources at the end).
 arXiv was blocked from the research session, so most claims below come from abstracts and summaries, not full
 texts. Read the full papers marked **(verify)** before citing them.
