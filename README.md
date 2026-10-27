@@ -9,7 +9,6 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.6-red)](https://pytorch.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.4-green)](https://developer.nvidia.com/cuda-toolkit)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A portfolio project on **biometric recognition from keystroke dynamics**: the typing-rhythm equivalent of a fingerprint or face-recognition system. It answers two questions:
 
