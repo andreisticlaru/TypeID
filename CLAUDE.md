@@ -68,7 +68,7 @@ Python work uses `.venv-model` (system Python has no torch).
 ## Git
 
 - Feature branches, merged to `main` by PR. Commit or push only when asked.
-- Never commit: `backend/gallery.db`, `backend/identify_log.jsonl`, `TODO.md`, `PRODUCT.md`, `FUTURE_PROSPECTS.md`,
+- Never commit: `backend/gallery.db`, `backend/identify_log.jsonl`, `TODO.md`, `PRODUCT.md`,
   `KNOWN_ISSUES.md`, `.claude/settings.local.json` (all gitignored — keep it that way).
 
 ## Code style

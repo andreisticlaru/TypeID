@@ -59,6 +59,27 @@ Access details for Buffalo, Clarkson II and BB-MAS not yet verified.
 - Cross-device (enrol on desktop, identify on phone) is a separate, much harder problem; BB-MAS is the dataset
   for it if it ever matters.
 
+## Results: levers 1–3 (2026-10-27, `comparison/levers.py`, results `comparison/results/levers_*.json`)
+
+KVC-style EER, 5 enrollment sequences; k = sequences averaged per query (score level). Ensemble = C1_s1 + C1 + C2
++ v1, each model's distances scaled by its median impostor distance. s-norm cohort: 300 people (Aalto) / ~20
+(KeyRecs), never scored. Paired 95% CIs vs the same model at k=1 in the JSONs.
+
+| | Aalto `unseen_nf` (9,701) | KeyRecs within (79) | KeyRecs cross-session (78) |
+|---|---|---|---|
+| C1_s1 k=1 / 2 / 3 | 2.57 / 1.61 / 1.27 | 4.19 / 3.00 / 2.09 | 7.84 / 6.56 / 6.75 |
+| v1 k=1 / 2 / 3 | 2.99 / 1.83 / 1.41 | 4.87 / 2.85 / 2.20 | 8.00 / 5.92 / 5.82 |
+| ensemble k=1 / 2 / 3 | 2.35 / 1.45 / 1.15 | 4.00 / 2.65 / 2.08 | 7.61 / 6.25 / 6.34 |
+| C1_s1 s-norm / ensemble s-norm | 2.53 / 2.36 | 4.63 / 4.10 | 7.22 / 6.78 |
+
+- **More typing per query is the big lever.** k=2 cuts Aalto EER ~40%, k=3 ~50% (FNMR@1% 8.9 → 2.0 for C2).
+  Cross-session it helps less (−1.3 to −2.2, ~20–27% relative): averaging doesn't remove the session step.
+- v1 gains most from pooling: at k≥2 the v1-vs-C gap closes, and cross-session v1 k=3 (5.82) is best.
+- **Ensemble:** −0.22 on Aalto at k=1 (CI −0.26, −0.19), stacks with pooling (1.15 at k=3). Noise-level on KeyRecs.
+- **s-norm:** ~0 on Aalto (−0.04), noise within KeyRecs, −0.6 to −1.1 cross-session (CIs near zero). Only worth it
+  for cross-session; check again on Buffalo.
+- Product implication: the demo identifies from 1 prompt "for speed"; 2–3 prompts roughly halve errors.
+
 ## Order
 
 1. Levers 1–3 first: existing models, minutes to hours, testable now on Aalto (`unseen_nf`) and KeyRecs

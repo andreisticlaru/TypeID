@@ -83,7 +83,8 @@ def train_step(model, optimizer, batch, arch, mode, margin, distance) -> tuple[f
 
 def build_model(args) -> tuple[torch.nn.Module, dict]:
     if args.arch == "v1":
-        return KeystrokeEncoder(), {}
+        kwargs = {} if args.hidden_size is None else {"hidden_size": args.hidden_size}
+        return KeystrokeEncoder(**kwargs), kwargs
     kwargs = {"normalize": args.normalize, "readout": args.readout, "batchnorm": not args.no_batchnorm}
     return TypeNetEncoder(**kwargs), kwargs
 
@@ -95,6 +96,7 @@ def main():
     parser.add_argument("--normalize", action="store_true", help="L2-normalize TypeNet's output")
     parser.add_argument("--readout", choices=["last", "mean"], default="last")
     parser.add_argument("--no-batchnorm", action="store_true")
+    parser.add_argument("--hidden-size", type=int, default=None, help="v1 only; default: v1's 128")
     parser.add_argument("--distance", choices=["sqeuclidean", "cosine"], default=None,
                         help="default: sqeuclidean for typenet, cosine for v1 (forced)")
     parser.add_argument("--margin", type=float, default=None, help="default: 1.5 sqeuclidean, 0.5 cosine")
