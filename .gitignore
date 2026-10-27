@@ -17,3 +17,7 @@ runs/
 comparison/results/pilot_old_split/
 data/preprocessed_typenet/
 backend/identify_log.jsonl
+
+# External zero-shot test data (KeyRecs, CC BY 4.0)
+data/keyrecs_raw/
+data/preprocessed_keyrecs_*/

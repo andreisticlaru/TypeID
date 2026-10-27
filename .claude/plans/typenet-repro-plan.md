@@ -250,7 +250,7 @@ Steps 1.1–1.6 and Step 2 (smoke tests, regression, timing) are done; see Progr
       checkpoints (learning curve); `unseen_nf` + `unseen_f` on the final only.
 - [x] R1 done  - [x] R1b done  - [x] R2 done  - [x] R3 done
 - [x] Apply the decision rule (§4); pick R4's base; queue R4 (and R5 if Q2 says so). → base = v1 net; R4 not yet queued (user go-ahead).
-- [ ] R4 done. Write the v2 spec + the reason for each choice in the Progress log.
+- [x] R4 done (83.2, +1.0 vs R1/R1b: below the 2-pt rule → v2 keeps R1's schedule). v2 spec in the 2026-10-11 log entry.
 - [ ] Commit (`feat: ablations under semi-hard mining`): code, results JSONs, plan.
 
 ## Step C — v2
@@ -479,12 +479,112 @@ and don't end a turn with a job running unless a watcher or background waiter wi
   BN, ms input, Linear head, dropout 0.2 — not separated (not needed for v2). Next: R4 (v1 net, semi from step 0)
   for the cheaper question, then Step C.
 
+- 2026-10-11 — **R4 (v1 net, semi-hard from step 0, seed 0): 83.2%** paper view (R50 99.9), EER 4.05/1.19/0.81, strict
+  48.0; curve 96k 80.9 → 168k 83.5 → 240k 83.2 (no collapse; spread 1.40 throughout). `unseen_nf` **83.3** (EER
+  4.12/1.14/0.78, strict 49.0), `unseen_f` **83.9** (EER 3.67/1.00/0.66, strict 51.1). vs R1/R1b (82.1/82.3):
+  **+1.0 Rank-1, EER G=1 −0.5**; above seed noise (0.2) but below the 2-pt rule → not adopted formally. Answer to
+  the cheaper question: the random warm-up is **not needed** (it did not hurt, and at 96k R4 is already 80.9 vs
+  R1b's 52.8). Beats v1-before-hardest (81.6) on `unseen_nf` by 1.7 with 80% of the triplets.
+- 2026-10-11 — **v2 spec (decision):** v1 net (`model.network.KeystrokeEncoder`: LSTM 128 ×2, dropout 0.2, masked
+  mean readout, Linear 128, L2, cosine margin 0.5), Adam lr 1e-3, batch 64, TypeNet split and no-floor cache, random
+  negatives until 40% then semi-hard, no hardest. Seed 2 (`p3_v2_s2`) uses R1's exact schedule (96k/240k) so R1, R1b
+  and s2 are three seeds of one recipe. v2-long (`p3_v2long`, 500k × 64 = 32M triplets, semi from 200k) keeps the
+  40% schedule for the same reason; R4's no-warm-up variant is a possible follow-up, not folded in.
+
+- 2026-10-11 — **v2 seed 2 (`p3_v2_s2`, R1's schedule, seed 2): 82.2%** paper view (R50 99.9), EER 4.50/1.40/0.99,
+  strict 45.0. `unseen_nf` **82.6** (EER 4.50/1.36/0.96), `unseen_f` **81.8** (EER 3.99/1.27/0.86). Three seeds of
+  the v2 recipe (R1, R1b, s2): paper 82.1/82.3/82.2 (mean 82.2, std 0.1); `unseen_nf` 82.7/82.3/82.6 (mean 82.5,
+  std 0.2); `unseen_f` 82.9/83.2/81.8 (mean 82.6, std 0.7, only 2,238 eligible people).
+- 2026-10-11 08:16 — v2-long started (`p3_v2long`, 500k × 64, semi from 200k). Queued behind it: its evals
+  (`unseen_nf` on every 50k checkpoint, paper + `unseen_f` on final), `p3_v2long_hard` (resume final, `--steps 600000
+  --semi-from 200000 --hard-from 500000`), `p3_v2_f` (floor cache, same spec), each with its evals.
+
+- 2026-10-11 11:20 — **v2-long (`p3_v2long`, 500k × 64 = 32M triplets, semi from 200k): 83.3%** paper view (R50
+  99.9), EER 4.23/1.29/0.90, strict 46.0. `unseen_nf` **83.7** (EER 4.26/1.28/0.88, strict 46.3), `unseen_f` **83.8**
+  (EER 3.59/1.10/0.71, strict 49.4). `unseen_nf` curve (Rank-1): 50k 49.4 → 100k 53.9 → 150k 55.1 → 200k 56.0 (random)
+  → 250k 78.5 → 300k 80.9 → 350k 81.8 → 400k 82.8 → 450k 82.8 → 500k 83.7. Passes v1-before-hardest (81.6, 19.2M)
+  at ~350k = **22.4M triplets** with 45% of the people (not cheaper per triplet: v1 reached 81.6 at 19.2M, v2-long
+  needs 22.4M; v2 at 15.4M is 82.5 mean because its 40/60 schedule is compressed). Budget alone adds ~+1.2 over v2 at
+  15.4M, so v1's 89.1 gap (5.4 pts) is not a budget effect: hardest phase or 2.2× training people.
+- 2026-10-11 11:20 — v2-long-hard started (`p3_v2long_hard`, resume v2-long final, 500k → 600k, hardest).
+  HARD-START ratio 0.913 (v1 on the old split: 0.96; collapse needs > 1), spread 1.407 → 1.38 after 1.3k steps.
+
+- 2026-10-11 12:2x — **v2-long-hard (`p3_v2long_hard`, v2-long final + 100k hardest steps = 38.4M triplets): 87.5%**
+  paper view (R50 99.9), EER 3.64/1.02/0.70, strict 51.1. `unseen_nf` **87.5** (EER 3.75/1.01/0.68, strict 51.7),
+  `unseen_f` **87.8** (EER 3.18/0.90/0.59, strict 54.1). Hardest mining on the long run: **+3.8** on `unseen_nf`, no
+  collapse (HARD-START ratio 0.913; loss 0.475 → 0.459 < margin 0.5; spread 1.407 → 1.38 → 1.387). Gap to v1 final
+  (89.1 / 89.0): **−1.6 / −1.2** Rank-1, EER G=1 3.75 vs 3.73 (nf), 3.18 vs 3.15 (f): ties on EER. v2-long-hard used
+  more triplets than v1 (38.4M vs 32M) and 45% of its people (68k vs 152k).
+
+- 2026-10-11 14:54 — **v2-f (`p3_v2_f`, floor cache, 500k × 64, semi from 200k, 32M, no hardest): 84.1%** paper
+  view (R50 99.9), EER 3.99/1.17/0.81, strict 47.7. `unseen_f` **85.0** (EER 3.54/1.02/0.71, strict 50.9),
+  `unseen_nf` **84.3** (EER 4.06/1.14/0.81, strict 48.4). vs v2-long (same budget, no-floor cache): **+1.2 on
+  `unseen_f`**, +0.6 on `unseen_nf`, +0.8 paper → training on the floor cache helps the live app's view and costs
+  nothing on the no-floor view. Not tried: floor cache + hardest phase (would be the natural v2 final candidate).
+  Step C done. All queue jobs finished, GPU idle.
+
+- 2026-10-11 — **Step D checks (D.2, D.4) done.** 38 unit tests pass (`features.test_extract typenet.test_network
+  typenet.test_losses data_v2.test_data_v2`). v1 regression reproduces exactly on v1's split and cache:
+  `encoder_hard` 89.8 / 56.9, `encoder` 60.5 / 28.4 (Rank-1 / strict; result JSONs deleted, not kept).
+  `git diff main --stat -- model eval backend frontend data/preprocessed data/split.json` is empty;
+  `features/extract.py` shows only the `min_keystrokes` keyword. Own backend on :8001 (never :8000/:5173): `/health`,
+  `/identify/rates` and a 40-keystroke `POST /identify` return 200 with `model/encoder_hard.pt` (`CHECKPOINT_PATH`),
+  a 2-keystroke query still 422s ("need at least 26 keystrokes"); PIDs 27940/10092 stopped, `identify_log.jsonl`
+  restored from backup, `gallery.db` hash unchanged. README: model-study section and table added (D.3).
+  Not done: D.1's single all-checkpoints table (the README table holds the headline rows), TODO.md item 4 (private
+  file, left for the user), commit (project rule: only when asked).
+
+- 2026-10-11 — **Paired person-level test (`comparison/paired.py`, 10 tests).** Why: the 10-draw ± measures
+  draw noise, and the draws cover only 6,471 of 10,001 unseen people (v1 scores 88.7 on those, 87.8 on the rest:
+  89.1 earlier vs 88.4 on everyone). Method: disjoint 1,000-person backgrounds so every person is scored once per
+  repetition, same partitions for every model, cluster bootstrap over people, verdict "better / worse / not worse
+  than 1 pt". Extras: per-person EER at G=1/5/10 (batched, matches `authentication_eer`), open-set
+  detect-and-identify rate at 1% / 5% stranger-accept (500 enrolled + 500 strangers per background).
+  First CPU run on `unseen_nf` (10,001 people, 10 reps, 2000 bootstraps), Rank-1 / EER G=1:
+  v1 88.5 / 3.69 · **v2-long-hard 87.2 / 3.69 (−1.25 [−1.55, −0.97] vs v1: worse)** · v2-f 84.1 / 4.04 · v2-long
+  83.2 / 4.20 · R4 83.1 / 4.08 · R1/R1b/s2 82.3/82.1/82.3 · v1 pre-hardest 80.9 · TN R3 75.8 · R2 71.7 · M0 66.6
+  (CI [65.9, 67.4] contains TypeNet's published 67.4). `unseen_f` (2,238 people): v1 89.5 / 3.12, v2-long-hard
+  88.2 / 3.17 (−1.28 [−2.10, −0.48]), v2-f 85.5. **Reading:** v2-long-hard is statistically worse than v1 on
+  Rank-1 by ~1.3 points and ties it on EER (G=1, G=10 within 0.03). Open-set DIR@1% FAR swings 9.2–13.9 across the
+  three v2 seeds (Rank-1 swings 0.2), so people-bootstrap CIs understate training-seed noise there: do not claim
+  open-set wins from one seed. Queued on the GPU behind the three hardest-phase runs: `p4_v2f_hard` (floor cache +
+  hardest), `p4_v2long_hard_s1/s2` (hardest-phase seeds), then paired runs `unseen_nf_all`, `unseen_f_all` and
+  `paper_view` (100,593 people, v1 excluded because it trained on them) in `runs/p5_paired/`.
+
+- 2026-10-11 17:48 — **Decision run: paired tests on all models (`comparison/results/paired_{unseen_nf_all,
+  unseen_f_all,paper_view}.json`, GPU, `runs/p5_paired/`).** New models: `p4_v2f_hard` (v2-f + 100k hardest steps on
+  the floor cache, HARD-START ratio 0.856) and two more seeds of v2-long's hardest phase (`p4_v2long_hard_s1/s2`,
+  ratios 0.990 / 0.985; nothing collapsed, spread 1.37–1.39 throughout).
+  - **Best model of ours: v2f_hard.** `unseen_nf` 87.92 [87.42, 88.42] / EER G=1 3.69 / G=10 0.67; `unseen_f`
+    89.08 [88.04, 90.09] / 3.10; paper view 88.21 [88.00, 88.42] / 3.63.
+  - **vs v1 (`encoder_hard`): a tie on EER, slightly behind on Rank-1.** `unseen_nf` −0.56 [−0.86, −0.27] ("worse,
+    by less than 1 pt"; v1 88.48, EER 3.69 vs 3.69); `unseen_f` −0.38 [−1.12, +0.37] (inconclusive; only 2,238
+    people, ±0.75; EER 3.10 vs 3.12). v2-long-hard (seed 0): −1.25 / −1.28. **No claim that any model beats v1.**
+  - **Hardest-phase seed noise (v2-long-hard seeds 0/1/2):** Rank-1 87.23 / 87.07 / 87.41 (std 0.17), EER G=1
+    3.69 / 4.03 / 3.80. Training-seed noise at the 15.4M recipe: 82.3 / 82.1 / 82.3.
+  - **Floor-cache training is a real small ingredient:** v2-f − v2-long +0.89 [+0.57, +1.22]; v2f_hard −
+    v2-long-hard +0.69 [+0.40, +0.98] (`unseen_nf`).
+  - **Warm-up is not needed:** R4 (15.4M, semi from step 0) − v2-long (32M, 40% random) = +0.06 [−0.29, +0.39]: the
+    same accuracy for 2.1x fewer triplets. R4 − v1-before-hardest = +2.20 [+1.81, +2.56] with 20% fewer triplets
+    and 45% of the people (one seed): the only "cheaper than v1" claim the data supports.
+  - **vs TypeNet (paper view, 100,593 people, reference = our TypeNet rebuild M0 66.54 [66.24, 66.84], EER 7.34):**
+    R2 +5.56, R3 +9.82, v2 seeds +15.7 to +15.9, R4 +17.10, v2-f +17.87, v2-long-hard +21.18, v2f_hard +21.66
+    [+21.38, +21.95] (all CIs exclude 0). Published TypeNet 67.4 sits 0.9 above M0's interval, which is the size of
+    the published number's own sampling error (k = 10,000 test queries, ±0.9), so the rebuild is calibrated. Our EER
+    stays ~2 points behind the paper's at equal Rank-1 (key code, open question 1).
+  - **Caveats:** bootstrap CIs are over people (test-set uncertainty), not training seeds; open-set DIR at 1% FAR
+    varies 9.2–13.9 across the three v2 seeds, so open-set claims need several seeds; v2f_hard is one training seed;
+    all v1 comparisons are on people v1 never trained on, but v1 had 152k training people vs 68k.
+
 ### Where to resume (handover)
 
-- **Done (2026-10-08):** Step A; Step B runs R1, R1b, R2, R3, R5 (trained + evaluated). v2 base = v1 net + semi-hard.
-  Committed and pushed (7bed2b5). Queue empty, GPU idle.
-- **Next:** R4 (v1 net, `--semi-from 0`), then Step C (v2 seed 2, v2-long at 32M, v2-long-hard, v2-f), then Step D.
-  Starts on the user's go-ahead.
+- **Done (2026-10-11):** Step A; Step B runs R1, R1b, R2, R3, R4, R5 (trained + evaluated). v2 base = v1 net +
+  semi-hard. Step B committed in 7bed2b5; R4's results JSONs and this log are uncommitted.
+- **Step C done (2026-10-11):** v2 seeds, v2-long, v2-long-hard (87.5 paper / 87.5 `unseen_nf` / 87.8 `unseen_f`),
+  v2-f (84.1 / 84.3 / 85.0). Queue empty, GPU idle. Step D checks passed (see log); uncommitted: README, this plan,
+  `comparison/results/p1_r4*`, `p3_*` JSONs.
+- **Open follow-ups (not run):** floor cache + hardest phase (the natural v2 final candidate); seeds for
+  v2-long-hard; whether v1's last 1.6 points are its 2.2x training people. v2 is **not** wired into the backend.
 - **Open questions for the write-up:**
   1. Our EER is ~1–2 pts behind the paper at equal Rank-1 (M0) — key code?
   2. v1 net beats TN + mean readout by ~6 pts; the remaining differences (no BN, ms input, Linear head, dropout) are
@@ -508,4 +608,5 @@ and don't end a turn with a job running unless a watcher or background waiter wi
 | R3 p1_r3_nf | TN split, no floor | 15.4M | 76.4% | 7.07 / 3.17 / 2.34 | 34.2% | TN + mean readout + semi |
 | R1b p1_r1b_nf | TN split, no floor | 15.4M | 82.3% | 4.44 / 1.37 / 0.96 | 45.0% | R1, seed 1 |
 | R5 p1_r5_nf | TN split, no floor | 15.4M | 72.0% | 7.01 / 3.02 / 2.21 | 33.5% | TN + L2 + cosine + semi |
+| R4 p1_r4_nf | TN split, no floor | 15.4M | 83.2% | 4.05 / 1.19 / 0.81 | 48.0% | v1 net, semi-hard from step 0 |
 | v1 encoder_hard (unseen_nf) | 10,001 unseen-by-both | 32M | 89.1% | 3.73 / 0.99 / 0.68 | 52.8% | the target (not paper view) |
