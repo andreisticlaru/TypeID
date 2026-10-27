@@ -25,6 +25,40 @@ best model, whatever the training cost.
 | 6 | Multi-session data | Buffalo (3 sessions, 28 days, keyboard swaps; email Prof. Upadhyaya), Clarkson II, KeyRecs: train or fine-tune. Only lever aimed straight at cross-session. | Yes | Depends on access |
 | 7 | Multi-visit enrolment | Enrol across 2+ visits, or adaptive gallery (add confident matches over time). | Yes | Product change, no training |
 
+## Extra training data: free text, mobile (lever 6 in detail)
+
+| Dataset | Text | People | Sessions | Access |
+|---|---|---|---|---|
+| Buffalo (SUNY) | Free text + transcription | ~148–157 | 3 over 28 days; keyboard swaps in the "rotation" subset | Request from the authors (cubs.buffalo.edu) |
+| Clarkson II | Real free text, logged on own PCs in normal use | 103 | ~2.5 years, continuous | Request from the authors |
+| BB-MAS (Syracuse) | Free + fixed text, desktop, phone and tablet | 117 | One 2–2.5 h session | Open, IEEE DataPort |
+| Aalto mobile / KVC mobile | Transcription on phones | ~60k+ | 1 | Through KVC |
+| KeyRecs (already used) | Transcription, 2×5 passages | 99 | 2, minutes apart | Open, Zenodo |
+
+Access details for Buffalo, Clarkson II and BB-MAS not yet verified.
+
+**Free text (desktop): yes, but for the sessions more than the free text.**
+- What Aalto lacks most is positives from different sessions. Training anchor/positive pairs drawn from
+  different sessions (Buffalo, Clarkson II) is the direct way to teach "same person, another visit".
+- Free text adds variety (thinking pauses, composing vs copying), which should help robustness, and the live app
+  could move towards free typing later.
+- These sets are tiny (~100–150 people) next to Aalto's 68k: training on them alone would overfit. Mix them into
+  Aalto training (oversampled, cross-session positives only) or fine-tune an Aalto model on them, never replace it.
+- Same rules as Aalto: split by person, and keep the evaluation people out of training. Buffalo can't be both the
+  training set and the final test: split its people, or keep KeyRecs `kvc_cross` as the test.
+- BB-MAS is one session, so it can't teach cross-session; its value is free vs fixed text and cross-device for
+  the same people. Open, so it's the one usable now.
+
+**Mobile: low priority for this app.**
+- Touchscreen typing is a different signal: tap hold times, almost no key rollover, autocorrect and swipe change
+  the timing. TypeNet and KVC both treat desktop and mobile as separate tasks with separate models.
+- The webapp is desktop. Joint training could spend model capacity on phone patterns and blur desktop ones; it
+  doesn't teach cross-session either (one session per person).
+- Possible use: Aalto mobile's ~60k people as extra pre-training scale, then fine-tune on desktop. Uncertain
+  gain; try only after levers 1–4, and only if a phone mode in the app becomes a goal.
+- Cross-device (enrol on desktop, identify on phone) is a separate, much harder problem; BB-MAS is the dataset
+  for it if it ever matters.
+
 ## Order
 
 1. Levers 1–3 first: existing models, minutes to hours, testable now on Aalto (`unseen_nf`) and KeyRecs
