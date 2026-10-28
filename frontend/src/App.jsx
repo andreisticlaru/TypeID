@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { pickSentence } from "./sentences.js";
 import { transcriptionMatch } from "./transcription.js";
+import { Badge, Button, Card, FILL, GhostButton, Kbd, Label } from "./ui.jsx";
 
 const API = "/api"; // proxied to the backend by vite.config.js
 // Prompts per operation. Thresholds exist for exactly these counts (backend/app/thresholds.py);
 // more prompts give a steadier profile, and eval/calibrate_auth.py measured how much that buys.
 const PROMPT_COUNTS = [1, 5, 10];
 const DEFAULT_PROMPTS = { enroll: 5, identify: 1, authenticate: 1 };
-const SHORTLIST = 5; // identify returns the top 10; ranks past this are shown greyed out
+const SHORTLIST = 5; // identify returns the top 10; ranks past this are shown faded
 // Backend rejects fewer than 26 paired keystrokes (features.extract.MIN_KEYSTROKES + 1); leave margin.
 const MIN_KEYSTROKES = 30;
 // Below this the typing isn't transcription any more (see TODO item 1): someone typing a phrase
@@ -70,22 +71,29 @@ function mean(values) {
 
 // Bands are anchored to the backend's own decision threshold, never to invented absolutes.
 function confidenceBand(similarity, threshold) {
-  if (similarity >= threshold + 0.15) return { label: "strong match", color: "var(--color-accent)" };
-  if (similarity >= threshold) return { label: "match", color: "var(--color-accent-deep)" };
-  return { label: "below threshold", color: "var(--color-text-secondary)" };
+  if (similarity >= threshold + 0.15) return "strong match";
+  if (similarity >= threshold) return "match";
+  return "below threshold";
 }
 
+const MODES = {
+  enroll: { label: "Enroll", fill: "mint", icon: "user" },
+  identify: { label: "Identify", fill: "sun", icon: "search" },
+  authenticate: { label: "Authenticate", fill: "lilac", icon: "shield" },
+};
+
+// Square caps and mitred joins: the icons share the borders' hard edges.
 const stroke = {
   fill: "none",
   stroke: "currentColor",
-  strokeWidth: 1.6,
-  strokeLinecap: "round",
-  strokeLinejoin: "round",
+  strokeWidth: 2,
+  strokeLinecap: "square",
+  strokeLinejoin: "miter",
 };
 
 function Icon({ path, size = 16, className = "" }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden="true" className={className} {...stroke}>
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden="true" className={`shrink-0 ${className}`} {...stroke}>
       {path}
     </svg>
   );
@@ -98,108 +106,160 @@ const icons = {
   alert: <path d="M8 4.5v4M8 11.5h.01M8 1.8l6 11H2z" />,
   declined: <path d="M8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12zM5.2 5.2l5.6 5.6" />,
   back: <path d="M9.5 3.5L5 8l4.5 4.5" />,
+  arrow: <path d="M3 8h10M9 4l4 4-4 4" />,
+  user: <path d="M8 8a2.6 2.6 0 1 0 0-5.2A2.6 2.6 0 0 0 8 8zM3 14c.6-2.6 2.6-4 5-4s4.4 1.4 5 4" />,
+  search: <path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM10.6 10.6L14 14" />,
+  shield: <path d="M8 1.8l5 2v4c0 3-2.2 5.2-5 6.4C5.2 13 3 10.8 3 7.8v-4z" />,
+  map: <path d="M1.8 3.8l4-1.6 4.4 1.6 4-1.6v10l-4 1.6-4.4-1.6-4 1.6zM5.8 2.2v10M10.2 3.8v10" />,
 };
 
-// The mark's concentric rings, reused as the working indicator: the logo scans while the model does.
-function ScanRings({ size = 18, active = false }) {
+// The mark's two broken rings, reused as the working indicator: the logo scans while the model does.
+function ScanRings({ size = 18 }) {
   const spin = { transformBox: "fill-box", transformOrigin: "center" };
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" className="shrink-0">
-      <circle
-        cx="24"
-        cy="24"
-        r="19"
-        fill="none"
-        stroke="var(--color-accent-deep)"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeDasharray="21 8.85"
-        style={{ ...spin, animation: active ? "scan-cw 2.4s linear infinite" : undefined }}
-      />
-      <circle
-        cx="24"
-        cy="24"
-        r="11.5"
-        fill="none"
-        stroke="var(--color-accent)"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        strokeDasharray="13 5.85"
-        style={{ ...spin, animation: active ? "scan-ccw 1.8s linear infinite" : undefined }}
-      />
+      <circle cx="24" cy="24" r="19" fill="none" stroke="currentColor" strokeWidth="5" strokeDasharray="15 4.9"
+        style={{ ...spin, animation: "scan-cw 2.4s linear infinite" }} />
+      <circle cx="24" cy="24" r="10.5" fill="none" stroke="currentColor" strokeWidth="4" strokeDasharray="9 4.2"
+        style={{ ...spin, animation: "scan-ccw 1.8s linear infinite" }} />
     </svg>
   );
 }
 
-const statusStyles = {
-  success: { color: "var(--color-accent)", icon: icons.check },
-  error: { color: "var(--color-danger)", icon: icons.alert },
-  declined: { color: "var(--color-caution)", icon: icons.declined },
-};
-
-// Destructive steps ask first, in-world, rather than through a browser confirm().
-function Choice({ question, actions }) {
+// A square icon tile, like the library's avatar: used for mode marks and verdict icons.
+function Tile({ children, size = "size-10", fill = "white", className = "" }) {
   return (
-    <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 animate-[rise_280ms_cubic-bezier(0.16,1,0.3,1)]">
-      <p className="m-0 flex items-start gap-2.5 text-[14.5px] leading-snug text-[var(--color-caution)]">
-        <Icon path={icons.alert} className="mt-[3px] shrink-0" />
-        <span>{question}</span>
-      </p>
-      <div className="mt-3.5 flex flex-wrap gap-2">
-        {actions.map((a) => (
-          <button
-            key={a.label}
-            onClick={a.onClick}
-            className={`px-4 py-2 rounded-full border text-[14px] font-semibold cursor-pointer transition-colors duration-150 ${
-              a.destructive
-                ? "border-transparent bg-[var(--color-danger)] text-[var(--color-card)] hover:opacity-85"
-                : "border-[var(--color-border)] bg-transparent text-[var(--color-text)] hover:bg-[var(--color-card)]"
-            }`}
-          >
-            {a.label}
-          </button>
-        ))}
+    <span className={`${size} grid place-items-center shrink-0 rounded-base border-2 border-ink ${FILL[fill]} ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+// The headline of every result: a filled card with an icon, a title, a line of detail and a stamp.
+function Verdict({ fill, icon, eyebrow, title, detail, aside, stamp }) {
+  return (
+    <div className={`flex flex-wrap items-center gap-4 rounded-base border-2 border-ink p-4 sm:p-5 shadow-brutal animate-[rise_320ms_cubic-bezier(0.16,1,0.3,1)] ${fill}`}>
+      <Tile size="size-14" className="text-2xl font-display font-bold">{icon}</Tile>
+      <div className="min-w-0 flex-1">
+        {eyebrow && <Label className="text-ink">{eyebrow}</Label>}
+        <h2 className="m-0 font-display text-[26px] sm:text-[30px] font-bold leading-tight tracking-tight break-words">{title}</h2>
+        {detail && <p className="m-0 mt-1 text-[15px] leading-snug">{detail}</p>}
       </div>
+      {(aside || stamp) && (
+        <div className="flex sm:flex-col items-center sm:items-end gap-3 sm:gap-2">
+          {aside}
+          {stamp && (
+            <span className="-rotate-3 rounded-base border-2 border-ink bg-white px-2.5 py-1 text-[12.5px] font-bold uppercase tracking-[0.1em] shadow-brutal-sm">
+              {stamp}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function Status({ status }) {
-  const style = status ? statusStyles[status.kind] : null;
+// A filled bar inside an ink track with the decision threshold as a dashed line through it.
+function ThresholdBar({ value, threshold, fill, height = "h-[18px]", line = "border-dashed" }) {
   return (
-    <div aria-live="polite" className={status ? "mt-6" : ""}>
-      {status && (
-        <p
-          className="m-0 flex items-start gap-2.5 text-[14.5px] leading-snug animate-[rise_320ms_cubic-bezier(0.16,1,0.3,1)]"
-          style={{ color: style.color }}
-        >
-          <Icon path={style.icon} className="mt-[3px] shrink-0" />
-          <span>{status.text}</span>
-        </p>
-      )}
+    <div className={`relative ${height} rounded-[3px] border-2 border-ink bg-wash`}>
+      <div
+        className={`h-full border-r-2 border-ink origin-left animate-[sweep_620ms_cubic-bezier(0.16,1,0.3,1)] ${fill}`}
+        style={{ width: `${Math.min(Math.max(value, 0), 1) * 100}%` }}
+      />
+      <span
+        aria-hidden="true"
+        className={`absolute -top-1.5 -bottom-1.5 border-l-2 border-ink ${line}`}
+        style={{ left: `${threshold * 100}%` }}
+      />
     </div>
   );
 }
 
 function PromptProgress({ done, total }) {
   return (
-    <div className="mt-2 flex items-center gap-1.5">
-      {Array.from({ length: total }, (_, i) => (
-        <span
-          key={i}
-          className={`h-1 rounded-full transition-colors duration-300 ${total > 5 ? "w-3.5" : "w-7"}`}
-          style={{
-            background:
-              i < done ? "var(--color-accent)" : i === done ? "var(--color-accent-deep)" : "var(--color-border)",
-          }}
-        />
-      ))}
-      <span className="ml-2 text-[13px] text-[var(--color-text-secondary)]">
-        {done + 1} of {total}
+    <div className="flex items-center gap-3">
+      <div className="flex gap-1.5" aria-hidden="true">
+        {Array.from({ length: total }, (_, i) => (
+          <span
+            key={i}
+            className={`h-3.5 rounded-[3px] border-2 border-ink ${total > 5 ? "w-4" : "w-8"} ${i < done ? "bg-mint" : "bg-white"}`}
+            style={
+              i === done
+                ? { background: "repeating-linear-gradient(-45deg, var(--color-mint) 0 4px, #fff 4px 8px)" }
+                : undefined
+            }
+          />
+        ))}
+      </div>
+      <span className="text-[13.5px] font-bold">
+        {Math.min(done + 1, total)} of {total}
       </span>
     </div>
   );
 }
+
+// Destructive steps ask first, in-world, rather than through a browser confirm(). Escape and the
+// backdrop pick the safe option.
+function Dialog({ title, children, actions, onDismiss }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onDismiss();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onDismiss]);
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/55 p-4" onClick={onDismiss}>
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="dialog-title"
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-[460px] rounded-base border-2 border-ink bg-white shadow-brutal-xl animate-[rise_220ms_cubic-bezier(0.16,1,0.3,1)]"
+      >
+        <div className="flex items-center gap-2.5 rounded-t-[3px] border-b-2 border-ink bg-coral px-4.5 py-3.5">
+          <Icon path={icons.alert} size={18} />
+          <h2 id="dialog-title" className="m-0 font-display text-lg font-bold">{title}</h2>
+        </div>
+        <div className="p-4.5">
+          <p className="m-0 text-[15px] leading-relaxed">{children}</p>
+          <div className="mt-5 flex flex-wrap justify-end gap-3">{actions}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Errors only: every success is a verdict card of its own.
+function ErrorNote({ error }) {
+  return (
+    <div aria-live="polite">
+      {error && (
+        <p className="m-0 mt-6 flex items-start gap-2.5 rounded-base border-2 border-ink bg-coral-soft px-4 py-3 text-[14.5px] leading-snug shadow-brutal animate-[rise_320ms_cubic-bezier(0.16,1,0.3,1)]">
+          <Icon path={icons.alert} className="mt-[3px]" />
+          <span>{error}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+const HOW_IT_WORKS = {
+  enroll: [
+    "Pick a name for your profile.",
+    "Type each sentence as it appears. Only the timing between keys is kept, never the text.",
+    "Your prompts are averaged into one 128-number profile in the gallery.",
+  ],
+  identify: [
+    "Type the sentence. No name needed.",
+    "TypeID ranks your rhythm against everyone enrolled, the 500 Aalto background people included.",
+    "If nobody clears the threshold, it says so instead of guessing.",
+  ],
+  authenticate: [
+    "Claim an enrolled identity.",
+    "Type the sentence to prove it.",
+    "One score against one threshold: accept or reject.",
+  ],
+};
 
 export default function App() {
   const inputRef = useRef(null);
@@ -217,7 +277,7 @@ export default function App() {
   const [identifyRates, setIdentifyRates] = useState(null); // measured outcomes per prompt count
   const [enrolled, setEnrolled] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState(null); // { kind: success | error | declined, text }
+  const [error, setError] = useState(null); // message of the last failed request
   const [matches, setMatches] = useState(null);
   const [pendingDiscard, setPendingDiscard] = useState(null); // { run } — awaiting confirmation
   const [collision, setCollision] = useState(null); // { sessions } — name already enrolled
@@ -231,7 +291,7 @@ export default function App() {
   const [showResults, setShowResults] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
   const [copyLabel, setCopyLabel] = useState("Copy JSON");
-  const [stats, setStats] = useState({ count: 0, duration: "0.0s", wpm: 0, dwell: "0ms", flight: "0ms" });
+  const [stats, setStats] = useState({ count: 0, duration: "0.0s", wpm: 0, dwell: "0ms", flight: "0ms", backspaces: 0 });
   const [dwellValues, setDwellValues] = useState([]);
   const [rawText, setRawText] = useState("");
   const [typed, setTyped] = useState(""); // mirrors the typing box, for the transcription check
@@ -277,14 +337,14 @@ export default function App() {
     setNameLocked(false);
     setEnrolled(false);
     setSessionCount(0);
-    setStatus(null);
+    setError(null);
     setPendingDiscard(null);
     setCollision(null);
   }
 
   // Recorded samples are unrecoverable once dropped, so anything that would drop them asks first.
-  function guardDiscard(run) {
-    if (sessionsRef.current.length > 0) setPendingDiscard({ run });
+  function guardDiscard(run, reason) {
+    if (sessionsRef.current.length > 0) setPendingDiscard({ run, reason });
     else run();
   }
 
@@ -294,7 +354,7 @@ export default function App() {
       setPromptCounts((counts) => ({ ...counts, [mode]: n }));
       setSessionCount(0);
       resetCapture();
-    });
+    }, `Changing to ${n} ${n === 1 ? "prompt" : "prompts"} starts over.`);
   }
 
   function switchMode(next) {
@@ -310,15 +370,15 @@ export default function App() {
         fetch(`${API}/people`)
           .then((r) => r.json())
           .then(setPeople)
-          .catch(() => setStatus({ kind: "error", text: "Couldn't load the enrolled people." }));
+          .catch(() => setError("Couldn't load the enrolled people."));
       }
-    });
+    }, `Switching to ${MODES[next].label} drops them.`);
   }
 
   function claim(personId) {
     setClaimId(personId);
     setAuth(null);
-    setStatus(null);
+    setError(null);
     if (personId) newSentence(false);
   }
 
@@ -326,18 +386,18 @@ export default function App() {
   function nextRound() {
     setMatches(null);
     setAuth(null);
-    setStatus(null);
+    setError(null);
     newSentence(false);
   }
 
+  // The no-match screen's way out: the same search with five prompts, which finds people far more often.
+  function retryWithMorePrompts() {
+    setPromptCounts((counts) => ({ ...counts, [mode]: 5 }));
+    setSessionCount(0);
+    nextRound();
+  }
+
   function onKeyDown(e) {
-    // Typing at a finished verdict means "go again": start a fresh round on a new prompt. The key
-    // itself is swallowed, since it was aimed at the old prompt.
-    if (showingResult) {
-      e.preventDefault();
-      nextRound();
-      return;
-    }
     // Enter submits (same as the button) and is never part of the typing sample.
     if (e.key === "Enter") {
       e.preventDefault();
@@ -359,9 +419,7 @@ export default function App() {
       keystrokeCountRef.current += 1;
       const count = keystrokeCountRef.current;
       const remaining = MIN_KEYSTROKES - count;
-      setProgressText(
-        remaining > 0 ? `${count} keystrokes · ${remaining} more to record` : `${count} keystrokes`
-      );
+      setProgressText(remaining > 0 ? `${count} keystrokes · ${remaining} more to go` : `${count} keystrokes`);
       setRecordDisabled(count < MIN_KEYSTROKES);
     }
   }
@@ -385,6 +443,7 @@ export default function App() {
       wpm: Math.round(wpm),
       dwell: `${Math.round(mean(dwells))}ms`,
       flight: `${Math.round(mean(flights))}ms`,
+      backspaces: records.filter((r) => r.key === "Backspace").length,
     });
     setDwellValues(dwells);
     setRawText(JSON.stringify({ sentence, typed: inputRef.current.value, keystrokes: records }, null, 2));
@@ -398,17 +457,14 @@ export default function App() {
       await postJson("/enroll", { person_id: name.toLowerCase(), name, sessions, replace });
       sessionsRef.current = [];
       setEnrolled(true);
-      setStatus({
-        kind: "success",
-        text: `${name} is enrolled from ${sessions.length} typing ${sessions.length === 1 ? "sample" : "samples"}.`,
-      });
+      setError(null);
     } catch (err) {
       if (err.status === 409) {
         // Hold the samples so choosing "replace" doesn't cost the user five sentences of retyping.
         setCollision({ sessions });
-        setStatus(null);
+        setError(null);
       } else {
-        setStatus({ kind: "error", text: `${err.message} Retype this sentence to try again.` });
+        setError(`${err.message} Retype this sentence to try again.`);
         resetCapture(); // retype this last sentence
       }
     } finally {
@@ -421,7 +477,7 @@ export default function App() {
     if (sessions.length < promptCount) {
       sessionsRef.current = sessions;
       setSessionCount(sessions.length);
-      setStatus(null);
+      setError(null);
       newSentence(true);
       return;
     }
@@ -430,7 +486,8 @@ export default function App() {
       return;
     }
 
-    // "What was measured" shows the last prompt; the decision uses all of them.
+    // "What was measured" shows the last prompt; the decision uses all of them. Blur first, so keys
+    // pressed while the request is out don't land in the event log the panel is built from.
     inputRef.current?.blur();
     renderResults();
     sessionsRef.current = [];
@@ -439,31 +496,17 @@ export default function App() {
     try {
       if (mode === "authenticate") {
         setAuth(await postJson("/authenticate", { person_id: claimId, sessions }));
-        setStatus(null);
       } else {
-        const res = await postJson("/identify", { sessions });
-        setMatches(res);
-        setStatus(
-          res.matched
-            ? null
-            : {
-                kind: "declined",
-                text: `No confident match. Nobody reached the ${res.min_confidence.toFixed(
-                  2
-                )} similarity threshold, so TypeID declined to name anyone. The closest candidates are below.`,
-              }
-        );
+        setMatches(await postJson("/identify", { sessions }));
       }
+      setError(null);
     } catch (err) {
-      setStatus({ kind: "error", text: err.message });
+      setError(err.message);
+      setShowResults(false);
     } finally {
       setBusy(false);
     }
   }
-
-  useEffect(() => {
-    if (capturing) inputRef.current?.focus();
-  }, [capturing, sentence]);
 
   // Measured error per prompt count, from the backend's calibration table rather than a copy here.
   useEffect(() => {
@@ -474,303 +517,294 @@ export default function App() {
   }, []);
 
   const match = transcriptionMatch(sentence, typed);
-  const matchPercent = Math.round(match.accuracy * 100);
+  // Rounded down, so 89.7% never shows as the "90% needed" it falls short of.
+  const matchPercent = Math.floor(match.accuracy * 100);
   // Once a verdict is showing, the typed prompts are spent: the next round starts on a new prompt,
   // so last round's keystrokes can't be resubmitted as the first prompt of a new one.
   const showingResult = mode !== "enroll" && !!(matches || auth);
   const canSubmit = !recordDisabled && !showingResult && match.accuracy >= MIN_MATCH;
   const maxDwell = Math.max(...dwellValues, 1);
   const lastPrompt = sessionCount === promptCount - 1;
-  const pillBase = "px-4 py-1.5 rounded-full border-0 text-sm font-semibold cursor-pointer transition-colors duration-150";
-  // Disabled goes flat rather than faded: a translucent accent muddies into an unreadable teal.
-  const primaryButton =
-    "w-full py-3.5 px-7 border-0 rounded-full bg-[var(--color-accent)] text-[var(--color-card)] font-sans text-base font-semibold cursor-pointer transition disabled:bg-[var(--color-surface)] disabled:text-[var(--color-text-secondary)] disabled:cursor-not-allowed enabled:hover:bg-[var(--color-accent-deep)] enabled:hover:text-[var(--color-text)] enabled:active:scale-[0.98]";
-  const ghostButton =
-    "w-full py-3 px-7 border border-[var(--color-border)] rounded-full bg-transparent text-[var(--color-text)] text-[15px] font-medium cursor-pointer transition-colors duration-150 hover:bg-[var(--color-surface)]";
+  const modeFill = MODES[mode].fill;
+  const claimedName = people.find((p) => p.person_id === claimId)?.name ?? claimId;
+  // The typing area gives way to whatever has to be answered first: a verdict or a name collision.
+  const typingVisible = capturing && !showingResult && !collision;
+
+  // Declared after showingResult: the typing box remounts when a verdict clears, and needs focus then.
+  useEffect(() => {
+    if (typingVisible) inputRef.current?.focus();
+  }, [typingVisible, sentence]);
+
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+  // Typing at a finished verdict means "go again": the next-round button holds focus and turns
+  // Enter or any printable key into a fresh round, swallowing the key that was aimed at the old prompt.
+  function nextRoundKeys(e) {
+    if (e.key === "Enter") {
+      e.preventDefault(); // keep the newline out of the next typing box
+      nextRound();
+    } else if (e.key.length === 1 && e.key !== " ") {
+      e.preventDefault();
+      nextRound();
+    }
+  }
+
+  let title;
+  let headAside = null;
+  if (mode === "enroll") {
+    title = nameLocked && !enrolled ? `Enrolling ${name}` : "Enroll";
+    headAside =
+      nameLocked && !enrolled ? (
+        <GhostButton onClick={() => guardDiscard(resetEnrollment, "Changing the name starts over.")}>
+          <Icon path={icons.back} size={14} />
+          Change name
+        </GhostButton>
+      ) : (
+        <Badge>{enrolled ? "Done" : "Step 1 of 2"}</Badge>
+      );
+  } else if (mode === "identify") {
+    title = "Who is typing?";
+    headAside = (
+      <Badge>
+        {plural(promptCount, "prompt")}
+        {matches && ` · threshold ${matches.min_confidence.toFixed(2)}`}
+      </Badge>
+    );
+  } else {
+    title = "Prove who you are";
+    headAside = <Badge>{claimId ? `Claiming ${claimedName}` : "Step 1 of 2"}</Badge>;
+  }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-5 px-4 py-10 sm:px-6">
-      <header className="w-full max-w-[560px] flex items-center gap-3.5">
-        <img src="/mark.png" alt="" width="46" height="46" className="rounded-[14px] shrink-0" />
-        <div className="min-w-0">
-          <h1 className="m-0 font-display text-[22px] font-bold tracking-tight leading-none">TypeID</h1>
-          <p className="m-0 mt-1.5 text-[13.5px] leading-snug text-[var(--color-text-secondary)]">
-            Recognizes you by <span className="font-semibold text-[var(--color-text)]">how</span> you type, not
-            what you type.
-          </p>
-        </div>
-      </header>
+    <div className="min-h-screen flex flex-col">
+      <header className="bg-white border-b-2 border-ink">
+        <div className="mx-auto max-w-[1160px] px-4 py-3 sm:px-6 sm:py-3.5 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <img src="/favicon.svg" alt="" width="48" height="48" className="shrink-0 drop-shadow-[3px_3px_0_var(--color-ink)]" />
+            <div className="min-w-0">
+              <h1 className="m-0 font-display text-2xl font-bold leading-none tracking-tight">TypeID</h1>
+              <p className="m-0 mt-1 text-[13px] leading-snug text-ink-2 hidden sm:block">
+                Recognizes you by <b className="text-ink">how</b> you type, not what you type.
+              </p>
+            </div>
+          </div>
 
-      <main className="w-full max-w-[560px] bg-[var(--color-card)] rounded-3xl shadow-[var(--shadow-card)] border border-[var(--color-border)] p-6 sm:p-10">
-        <div className="flex flex-wrap gap-2 mb-7">
-          {["enroll", "identify", "authenticate"].map((m) => (
-            <button
-              key={m}
-              onClick={() => switchMode(m)}
-              aria-pressed={mode === m}
-              className={`${pillBase} capitalize ${
-                mode === m
-                  ? "bg-[var(--color-accent)] text-[var(--color-card)]"
-                  : "bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
-              }`}
-            >
-              {m}
-            </button>
-          ))}
+          <nav
+            aria-label="Mode"
+            className="order-3 w-full md:order-none md:w-auto md:ml-auto flex gap-1.5 rounded-base border-2 border-ink bg-page p-1.5"
+          >
+            {Object.entries(MODES).map(([m, { label, fill, icon }]) => (
+              <button
+                key={m}
+                onClick={() => switchMode(m)}
+                aria-pressed={mode === m}
+                className={`flex-1 md:flex-none inline-flex h-9 items-center justify-center gap-2 rounded-base border-2 px-3 sm:px-4 font-sans text-[14.5px] font-bold cursor-pointer transition-colors ${
+                  mode === m
+                    ? `${FILL[fill]} border-ink text-ink shadow-brutal-sm`
+                    : "border-transparent bg-transparent text-ink-2 hover:text-ink hover:border-ink"
+                }`}
+              >
+                <Icon path={icons[icon]} size={15} className="hidden sm:block" />
+                {label}
+              </button>
+            ))}
+          </nav>
+
           <a
             href={`${API}/map`}
             target="_blank"
             rel="noreferrer"
-            className={`${pillBase} ml-auto no-underline inline-flex items-center gap-1.5 bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]`}
+            className="ml-auto md:ml-0 inline-flex h-11 items-center gap-2 rounded-base border-2 border-ink bg-white px-4 font-bold text-ink no-underline shadow-brutal transition-all duration-100 hover:translate-x-1 hover:translate-y-1 hover:shadow-none"
           >
+            <Icon path={icons.map} />
             Map
             <Icon path={icons.external} size={14} />
           </a>
         </div>
+      </header>
 
-        {!enrolled && (
-          <fieldset className="m-0 p-0 border-0 mb-7">
-            <legend className="mb-2.5 p-0 text-[13px] font-medium text-[var(--color-text-secondary)]">
-              Prompts to type · more prompts, steadier profile, fewer mistakes
-            </legend>
-            <div className="flex gap-2">
-              {PROMPT_COUNTS.map((n) => (
-                <label
-                  key={n}
-                  className={`grid place-items-center min-w-11 h-11 px-3 cursor-pointer rounded-full text-[15px] font-semibold tabular-nums border transition-colors duration-150 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-[var(--color-accent)] ${
-                    promptCount === n
-                      ? "border-transparent bg-[var(--color-accent)] text-[var(--color-card)]"
-                      : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:border-[var(--color-accent-deep)]"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="prompt-count"
-                    value={n}
-                    checked={promptCount === n}
-                    onChange={() => changePromptCount(n)}
-                    className="sr-only"
-                  />
-                  {n}
-                </label>
-              ))}
-            </div>
-            {/* The cost of a snappy one-prompt identify, stated up front rather than discovered. */}
-            {mode === "identify" && identifyRates && (
-              <p className="m-0 mt-3 text-[12.5px] leading-snug text-[var(--color-text-secondary)]">
-                Finds an enrolled person{" "}
-                {PROMPT_COUNTS.map((n, i) => (
-                  <span key={n}>
-                    {i > 0 && " · "}
-                    <span className={`whitespace-nowrap ${n === promptCount ? "font-semibold text-[var(--color-text)]" : ""}`}>
-                      {Math.round(identifyRates.found_percent[n])}% with {n}
-                    </span>
-                  </span>
-                ))}
-                . Names someone who isn't enrolled about{" "}
-                {Math.round(identifyRates.stranger_named_percent[promptCount])}% of the time.
-              </p>
-            )}
-          </fieldset>
-        )}
-
-        {mode === "enroll" && !nameLocked && (
-          <>
-            <p className="m-0 mb-6 text-[15px] leading-relaxed text-[var(--color-text-secondary)]">
-              Enrolling records your rhythm across {promptCount === 1 ? "one short sentence" : `${promptCount} short sentences`}. Nothing you type is
-              stored as text — only the timing between keys.
-            </p>
-            <label htmlFor="person-name" className="block mb-2 text-[13px] font-medium text-[var(--color-text-secondary)]">
-              Your name
-            </label>
-            <input
-              id="person-name"
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                // lockName moves focus into the typing box mid-keypress; without this, the browser
-                // inserts this Enter's line break there and every character after it misaligns.
-                e.preventDefault();
-                lockName();
-              }}
-              placeholder="e.g. Andrei"
-              className="w-full mb-7 border-0 border-b border-[var(--color-border)] bg-transparent text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] text-[17px] py-2 outline-none focus:border-b-[var(--color-accent)]"
-            />
-            <button onClick={lockName} disabled={!name.trim()} className={primaryButton}>
-              Start enrollment
-            </button>
-          </>
-        )}
-
-        {mode === "authenticate" && (
-          <>
-            <p className="m-0 mb-6 text-[15px] leading-relaxed text-[var(--color-text-secondary)]">
-              Verification is a yes/no question, not a search: claim an identity, type the sentence,
-              and TypeID compares your rhythm against that one person's stored profile.
-            </p>
-            {/* Real radios behind styled labels: a native select popup is drawn by the OS, which
-                ignores this palette and rendered light text on a white list. This keeps the
-                arrow-key behaviour and semantics a pick-one control should have. */}
-            <fieldset className="m-0 p-0 border-0 mb-7">
-              <legend className="mb-3 p-0 text-[13px] font-medium text-[var(--color-text-secondary)]">
-                Who do you claim to be?
-              </legend>
-              {people.length === 0 ? (
-                <p className="m-0 text-[14px] text-[var(--color-text-secondary)]">
-                  Nobody is enrolled yet — enroll someone first, then come back to verify them.
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {people.map((p) => (
-                    <label
-                      key={p.person_id}
-                      className={`cursor-pointer rounded-full px-4 py-2.5 text-[15px] font-medium border transition-colors duration-150 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-[var(--color-accent)] ${
-                        claimId === p.person_id
-                          ? "border-transparent bg-[var(--color-accent)] text-[var(--color-card)]"
-                          : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:border-[var(--color-accent-deep)]"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="claim"
-                        value={p.person_id}
-                        checked={claimId === p.person_id}
-                        onChange={() => claim(p.person_id)}
-                        className="sr-only"
-                      />
-                      {p.name}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </fieldset>
-          </>
-        )}
-
-        {mode === "enroll" && nameLocked && !enrolled && (
-          <div className="mb-7 flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-[17px] font-medium truncate">Enrolling {name}</div>
-              <PromptProgress done={sessionCount} total={promptCount} />
-            </div>
-            <button
-              onClick={() => guardDiscard(resetEnrollment)}
-              className="shrink-0 inline-flex items-center gap-1 border-0 bg-transparent py-3 pl-3 text-[13px] font-medium text-[var(--color-text-secondary)] cursor-pointer transition-colors duration-150 hover:text-[var(--color-text)]"
-            >
-              <Icon path={icons.back} size={14} />
-              Change name
-            </button>
+      <div className="mx-auto w-full max-w-[1160px] flex-1 px-4 py-6 sm:px-6 sm:py-8 grid gap-6 lg:gap-7 lg:grid-cols-[minmax(0,1fr)_360px] items-start">
+        <main className="min-w-0 rounded-base border-2 border-ink bg-white shadow-brutal-lg">
+          <div className={`flex flex-wrap items-center gap-x-3.5 gap-y-2.5 rounded-t-[3px] border-b-2 border-ink px-4 py-3.5 sm:px-6 sm:py-4 ${FILL[modeFill]}`}>
+            <Tile>
+              <Icon path={icons[MODES[mode].icon]} size={18} />
+            </Tile>
+            <h2 className="m-0 min-w-[11ch] flex-1 font-display text-xl sm:text-2xl font-bold tracking-tight break-words">{title}</h2>
+            <div className="shrink-0">{headAside}</div>
           </div>
-        )}
 
-        {capturing && (
-          <>
-            {mode === "identify" && (
-              <p className="m-0 mb-6 text-[15px] leading-relaxed text-[var(--color-text-secondary)]">
-                Type {promptCount === 1 ? "the sentence below" : `${promptCount} sentences`} and TypeID will rank
-                your rhythm against everyone enrolled.
-              </p>
-            )}
-            {mode === "authenticate" && (
-              <p className="m-0 mb-6 text-[15px] leading-relaxed text-[var(--color-text-secondary)]">
-                Claiming to be{" "}
-                <span className="font-semibold text-[var(--color-text)]">
-                  {people.find((p) => p.person_id === claimId)?.name ?? claimId}
-                </span>
-                . Type {promptCount === 1 ? "the sentence below" : `${promptCount} sentences`} to prove it.
-              </p>
-            )}
-
-            {mode !== "enroll" && promptCount > 1 && !showingResult && (
-              <div className="mb-5">
-                <PromptProgress done={sessionCount} total={promptCount} />
+          <div className="px-4 py-5 sm:px-6 sm:py-7">
+            {mode === "enroll" && !nameLocked && (
+              <div className="flex flex-col gap-5">
+                <p className="m-0 text-[17px] leading-relaxed">
+                  Enrolling records your rhythm across{" "}
+                  <b>{promptCount === 1 ? "one short sentence" : `${promptCount} short sentences`}</b>. Nothing you type is
+                  stored as text, only the timing between keys.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <Label as="label" htmlFor="person-name">Your name</Label>
+                  <input
+                    id="person-name"
+                    autoFocus
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return;
+                      // lockName moves focus into the typing box mid-keypress; without this, the browser
+                      // inserts this Enter's line break there and every character after it misaligns.
+                      e.preventDefault();
+                      lockName();
+                    }}
+                    placeholder="e.g. Andrei"
+                    className="h-13 w-full rounded-base border-2 border-ink bg-white px-3.5 font-sans text-[18px] text-ink placeholder:text-faint"
+                  />
+                </div>
+                <Button size="lg" onClick={lockName} disabled={!name.trim()}>
+                  Start enrollment
+                  <Icon path={icons.arrow} />
+                </Button>
+                <p className="m-0 flex items-center gap-2 text-[13px] text-ink-2">
+                  Press <Kbd>Enter ↵</Kbd> to start
+                </p>
               </div>
             )}
 
-            <div className="flex items-start gap-3 mb-7">
-              <p className="flex-1 m-0 font-display text-[22px] sm:text-2xl leading-snug font-medium tracking-tight">
-                <span className="sr-only">{sentence}</span>
-                <span aria-hidden="true">
-                  {[...sentence].map((ch, i) => (
-                    <span
-                      key={i}
-                      className={
-                        match.chars[i] === "correct"
-                          ? "text-[var(--color-text)]"
-                          : match.chars[i] === "wrong"
-                            ? "rounded-sm text-[var(--color-danger)] bg-[color-mix(in_srgb,var(--color-danger)_20%,transparent)]"
-                            : `text-[var(--color-text-secondary)]${
-                                i === typed.length ? " underline decoration-2 underline-offset-4 decoration-[var(--color-accent)]" : ""
-                              }`
-                      }
-                    >
-                      {ch}
+            {mode === "authenticate" && !showingResult && (
+              <>
+                <p className="m-0 mb-5 text-[17px] leading-relaxed">
+                  Verification is a yes/no question, not a search: claim an identity, type the sentence, and TypeID
+                  compares your rhythm with that one person's stored profile.
+                </p>
+                {/* Real radios behind styled labels, so arrow keys and screen readers treat this as a
+                    pick-one control, which a grid of buttons wouldn't be. */}
+                <fieldset className="m-0 mb-7 p-0 border-0">
+                  <Label as="legend" className="mb-3 p-0">Who do you claim to be?</Label>
+                  {people.length === 0 ? (
+                    <p className="m-0 text-[14.5px] text-ink-2">
+                      Nobody is enrolled yet. Enroll someone first, then come back to verify them.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {people.map((p) => (
+                        <label
+                          key={p.person_id}
+                          className={`flex items-center gap-2.5 min-w-0 cursor-pointer rounded-base border-2 border-ink px-3 py-2.5 transition-all duration-100 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-ink ${
+                            claimId === p.person_id ? "bg-lilac shadow-brutal" : "bg-white hover:shadow-brutal-sm"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="claim"
+                            value={p.person_id}
+                            checked={claimId === p.person_id}
+                            onChange={() => claim(p.person_id)}
+                            className="sr-only"
+                          />
+                          <Tile size="size-9" className="font-display font-bold text-[15px]">
+                            {p.name.charAt(0).toUpperCase()}
+                          </Tile>
+                          <span className="min-w-0">
+                            <span className="block truncate font-bold">{p.name}</span>
+                            <span className="block text-xs text-ink-2">{plural(p.enroll_prompts, "prompt")}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </fieldset>
+              </>
+            )}
+
+            {mode === "enroll" && nameLocked && !enrolled && (
+              <div className="mb-6">
+                <PromptProgress done={collision ? promptCount : sessionCount} total={promptCount} />
+              </div>
+            )}
+
+            {typingVisible && (
+              <>
+                {mode === "identify" && (
+                  <p className="m-0 mb-5 text-[17px] leading-relaxed">
+                    Type {promptCount === 1 ? "the sentence below" : `${promptCount} sentences`} and TypeID ranks your
+                    rhythm against <b>everyone enrolled</b>.
+                  </p>
+                )}
+                {mode !== "enroll" && promptCount > 1 && (
+                  <div className="mb-5">
+                    <PromptProgress done={sessionCount} total={promptCount} />
+                  </div>
+                )}
+
+                <div className="relative rounded-base border-2 border-ink bg-soft p-4 pr-16 sm:p-5 sm:pr-18">
+                  <Label className="block mb-2">Type this</Label>
+                  <p className="m-0 font-display text-[22px] sm:text-[27px] leading-[1.42] font-medium tracking-tight">
+                    <span className="sr-only">{sentence}</span>
+                    <span aria-hidden="true">
+                      {[...sentence].map((ch, i) => (
+                        <span
+                          key={i}
+                          className={
+                            match.chars[i] === "correct"
+                              ? "text-ink"
+                              : match.chars[i] === "wrong"
+                                ? "rounded-[2px] bg-coral text-ink shadow-[inset_0_-2px_0_var(--color-ink)]"
+                                : `text-faint${i === typed.length ? " shadow-[inset_0_-4px_0_var(--color-mint-deep)]" : ""}`
+                          }
+                        >
+                          {ch}
+                        </span>
+                      ))}
+                      {match.extra > 0 && <span className="text-coral"> +{match.extra}</span>}
                     </span>
-                  ))}
-                  {match.extra > 0 && <span className="text-[var(--color-danger)]"> +{match.extra}</span>}
-                </span>
-              </p>
-              <button
-                onClick={() => newSentence(true)}
-                className="shrink-0 grid place-items-center w-9 h-9 rounded-full border-0 bg-[var(--color-surface)] text-[var(--color-text-secondary)] cursor-pointer transition duration-150 hover:text-[var(--color-text)] hover:rotate-45"
-                title="Swap in a different sentence"
-                aria-label="Swap in a different sentence"
-              >
-                <Icon path={icons.refresh} />
-              </button>
-            </div>
+                  </p>
+                  <Button
+                    fill="white"
+                    size="icon"
+                    onClick={() => newSentence(true)}
+                    className="absolute top-3 right-3"
+                    title="Swap in a different sentence"
+                    aria-label="Swap in a different sentence"
+                  >
+                    <Icon path={icons.refresh} />
+                  </Button>
+                </div>
 
-            <label htmlFor="capture" className="sr-only">
-              Type the sentence shown above
-            </label>
-            <textarea
-              id="capture"
-              ref={inputRef}
-              onKeyDown={onKeyDown}
-              onKeyUp={onKeyUp}
-              onInput={(e) => setTyped(e.target.value)}
-              onPaste={(e) => e.preventDefault()}
-              readOnly={showingResult}
-              onFocus={() => showingResult && nextRound()} // clicking back in to type starts the next round
-              className="w-full resize-none border-0 border-b border-[var(--color-border)] bg-transparent text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] font-sans text-[17px] leading-relaxed py-2 outline-none transition-colors duration-150 focus:border-b-[var(--color-accent)]"
-              rows="3"
-              placeholder="Start typing… (pasting is disabled — the rhythm is the point)"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck="false"
-            />
+                <label htmlFor="capture" className="sr-only">
+                  Type the sentence shown above
+                </label>
+                <textarea
+                  id="capture"
+                  ref={inputRef}
+                  onKeyDown={onKeyDown}
+                  onKeyUp={onKeyUp}
+                  onInput={(e) => setTyped(e.target.value)}
+                  onPaste={(e) => e.preventDefault()}
+                  className="mt-4 block w-full resize-none rounded-base border-2 border-ink bg-white px-3.5 py-3 font-sans text-[18px] leading-relaxed text-ink placeholder:text-faint focus:outline-none focus-visible:outline-none focus:shadow-[0_0_0_3px_#fff,0_0_0_5px_var(--color-ink)]"
+                  rows="3"
+                  placeholder="Start typing… pasting is off, the rhythm is the point"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
+                />
 
-            <div className="mt-2.5 text-[13px] tabular-nums text-[var(--color-text-secondary)]">
-              {progressText} ·{" "}
-              <span className={typed && match.accuracy < MIN_MATCH ? "text-[var(--color-danger)]" : ""}>
-                {matchPercent}% match{match.accuracy < MIN_MATCH && `, ${Math.round(MIN_MATCH * 100)}% needed`}
-              </span>
-            </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2 tabular-nums">
+                  <Badge>{progressText}</Badge>
+                  <Badge fill={typed && match.accuracy < MIN_MATCH ? "coral" : typed ? "mint" : "white"}>
+                    {matchPercent}% match
+                  </Badge>
+                  <span className="ml-auto text-[13px] text-ink-2">{Math.round(MIN_MATCH * 100)}% match needed</span>
+                </div>
 
-            {showingResult ? (
-              // Takes the submit button's place and focus, so Enter moves straight on to the next round. The
-              // distinct keys make React mount a new element; reusing the old one would skip autoFocus.
-              <button
-                key="next"
-                onClick={nextRound}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault(); // same focus hand-off as the name field: keep the newline out of the box
-                    nextRound();
-                  } else if (e.key.length === 1 && e.key !== " ") nextRound(); // just start typing
-                }}
-                autoFocus
-                className={`mt-7 ${primaryButton}`}
-              >
-                Try another sentence
-              </button>
-            ) : (
-              <button key="submit" onClick={submit} disabled={!canSubmit || busy} className={`mt-7 ${primaryButton}`}>
-                <span className="inline-flex items-center justify-center gap-2.5">
-                  {busy && <ScanRings size={17} active />}
+                <Button
+                  key="submit"
+                  size="lg"
+                  fill={modeFill}
+                  onClick={submit}
+                  disabled={!canSubmit || busy}
+                  className="mt-6"
+                >
+                  {busy && <ScanRings size={18} />}
                   {busy
                     ? mode === "identify"
                       ? "Comparing against the gallery…"
@@ -784,223 +818,351 @@ export default function App() {
                         : mode === "authenticate"
                           ? "Verify me"
                           : "Finish enrollment"}
-                </span>
-              </button>
+                  {!busy && <Icon path={icons.arrow} />}
+                </Button>
+                <p className="m-0 mt-3.5 flex items-center gap-2 text-[13px] text-ink-2">
+                  <Kbd>Enter ↵</Kbd> submits · Enter is never part of the sample
+                </p>
+              </>
             )}
-          </>
-        )}
 
-        {pendingDiscard && (
-          <Choice
-            question={`Discard ${sessionsRef.current.length} recorded ${
-              sessionsRef.current.length === 1 ? "sample" : "samples"
-            }? They can't be recovered.`}
-            actions={[
-              { label: "Keep recording", onClick: () => setPendingDiscard(null) },
-              {
-                label: "Discard",
-                destructive: true,
-                onClick: () => {
+            {collision && (
+              <div className="grid grid-cols-[18px_1fr] gap-x-3 gap-y-1 rounded-base border-2 border-ink bg-coral-soft px-4 py-3.5 shadow-brutal animate-[rise_280ms_cubic-bezier(0.16,1,0.3,1)]">
+                <Icon path={icons.alert} size={18} className="mt-0.5" />
+                <p className="m-0 font-bold">Someone is already enrolled as {name}</p>
+                <p className="m-0 col-start-2 leading-snug">
+                  Replacing overwrites their stored typing profile for good. Your {plural(collision.sessions.length, "sample")}{" "}
+                  are kept until you choose.
+                </p>
+                <div className="col-start-2 mt-3 flex flex-wrap gap-3">
+                  <Button fill="white" onClick={resetEnrollment}>Use a different name</Button>
+                  <Button fill="coral" onClick={() => sendEnrollment(collision.sessions, true)} disabled={busy}>
+                    {busy && <ScanRings size={16} />}
+                    Replace {name}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {enrolled && (
+              // Testing yourself is the point of enrolling, so it's the primary action and takes focus
+              // (Enter continues); enrolling someone else is the quieter alternative.
+              <div className="flex flex-col gap-6">
+                <Verdict
+                  fill="bg-mint"
+                  icon={<Icon path={icons.check} size={28} />}
+                  title={`${name} is enrolled`}
+                  detail={`Profile built from ${plural(promptCount, "typing sample")}.`}
+                  stamp="Saved"
+                />
+                <p className="m-0 text-ink-2">
+                  Testing yourself is the point of enrolling: identify yourself now, without saying who you are.
+                </p>
+                <div className="flex flex-col gap-3">
+                  <Button size="lg" fill="sun" onClick={() => switchMode("identify")} autoFocus>
+                    <Icon path={icons.search} />
+                    Identify yourself now
+                  </Button>
+                  <Button size="lg" fill="white" onClick={resetEnrollment}>
+                    Enroll another person
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {mode === "identify" && matches && (
+              <div className="flex flex-col gap-6">
+                {matches.matched ? (
+                  <Verdict
+                    fill="bg-sun"
+                    icon={matches.results[0].name.charAt(0).toUpperCase()}
+                    eyebrow="Best match"
+                    title={matches.results[0].name}
+                    aside={
+                      <span className="font-display text-[30px] font-bold leading-none tabular-nums">
+                        {matches.results[0].similarity.toFixed(3)}
+                      </span>
+                    }
+                    stamp={confidenceBand(matches.results[0].similarity, matches.min_confidence)}
+                  />
+                ) : (
+                  <Verdict
+                    fill="bg-sun-soft"
+                    icon={<Icon path={icons.declined} size={26} />}
+                    title="No confident match"
+                    detail={`Nobody reached the ${matches.min_confidence.toFixed(
+                      2
+                    )} threshold, so TypeID declined to name anyone. That's the right outcome for someone who isn't enrolled.`}
+                  />
+                )}
+
+                {matches.results.length > 0 && (
+                  <div>
+                    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
+                      <h3 className="m-0 font-display text-lg font-bold">
+                        {matches.matched ? "Ranked candidates" : "Closest candidates"}
+                      </h3>
+                      <span className="text-[13px] text-ink-2">
+                        finds {Math.round(matches.found_percent)}% with {plural(matches.query_prompts, "prompt")}
+                      </span>
+                    </div>
+                    <ol className="m-0 p-0 list-none flex flex-col gap-2.5">
+                      {matches.results.map((r, i) => (
+                        // Ranks past the shortlist are context (how crowded it is just below), so they recede.
+                        <li
+                          key={r.person_id}
+                          className={`grid grid-cols-[34px_minmax(0,1fr)_64px] sm:grid-cols-[34px_minmax(0,150px)_1fr_74px] items-center gap-x-3.5 gap-y-2 rounded-base border-2 border-ink px-3 py-2.5 ${
+                            i === 0 && matches.matched ? "bg-sun-soft shadow-brutal" : "bg-white"
+                          } ${i >= SHORTLIST ? "opacity-45 border-dashed" : ""}`}
+                        >
+                          <Tile size="size-[34px]" fill={i === 0 && matches.matched ? "sun" : "white"} className="font-display font-bold text-[15px]">
+                            {i + 1}
+                          </Tile>
+                          <span className="truncate font-bold">{r.name}</span>
+                          <div className="col-span-3 row-start-2 sm:col-span-1 sm:col-start-3 sm:row-start-1">
+                            <ThresholdBar
+                              value={r.similarity}
+                              threshold={matches.min_confidence}
+                              fill={r.similarity >= matches.min_confidence ? (i === 0 ? "bg-sun" : "bg-mint") : "bg-[#c9c6d8]"}
+                            />
+                          </div>
+                          <span className="col-start-3 row-start-1 sm:col-start-4 text-right font-display text-[15px] font-bold tabular-nums">
+                            {r.similarity.toFixed(3)}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                    <p className="m-0 mt-2.5 text-[12.5px] text-ink-2">
+                      Dashed line: the {matches.min_confidence.toFixed(2)} threshold for naming someone.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button size="lg" fill="sun" onClick={nextRound} onKeyDown={nextRoundKeys} autoFocus className="sm:flex-1">
+                    Try another sentence
+                    <Icon path={icons.arrow} />
+                  </Button>
+                  {!matches.matched && promptCount < 5 && (
+                    <Button size="lg" fill="white" onClick={retryWithMorePrompts} className="sm:flex-1">
+                      Use 5 prompts
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {mode === "authenticate" && auth && (
+              <div className="flex flex-col gap-6">
+                <Verdict
+                  fill={auth.accepted ? "bg-mint" : "bg-coral"}
+                  icon={<Icon path={auth.accepted ? icons.check : icons.declined} size={28} />}
+                  title={auth.accepted ? `Verified as ${auth.name}` : "Not verified"}
+                  detail={
+                    auth.accepted
+                      ? `This rhythm matches ${auth.name}'s stored profile closely enough to accept.`
+                      : `This rhythm isn't close enough to ${auth.name}'s stored profile to accept the claim.`
+                  }
+                  stamp={auth.accepted ? "Accepted" : "Rejected"}
+                />
+
+                {/* The decision is one number against one line: show both rather than just the verdict. */}
+                <div>
+                  <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 tabular-nums">
+                    <span className="font-bold">Similarity {auth.similarity.toFixed(3)}</span>
+                    <span className="text-[13px] text-ink-2">
+                      threshold {auth.threshold.toFixed(2)} · {auth.operating_point} {auth.eer_percent}%
+                    </span>
+                  </div>
+                  <ThresholdBar
+                    value={auth.similarity}
+                    threshold={auth.threshold}
+                    fill={auth.accepted ? "bg-mint" : "bg-coral"}
+                    height="h-[30px]"
+                    line="border-solid border-l-[3px]"
+                  />
+                  <p className="m-0 mt-3 text-[13px] leading-snug text-ink-2">
+                    {auth.name} enrolled from {auth.enroll_prompts}, verified with {auth.query_prompts}.{" "}
+                    {auth.extrapolated
+                      ? `No measured threshold for ${auth.enroll_prompts} + ${auth.query_prompts} (Aalto has at most 15 prompts per person), so this borrows the 10 + 5 one.`
+                      : `At this setting, ${auth.eer_percent}% of decisions are wrong either way.`}
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button size="lg" fill="lilac" onClick={nextRound} onKeyDown={nextRoundKeys} autoFocus className="sm:flex-1">
+                    Try another sentence
+                  </Button>
+                  <Button size="lg" fill="white" onClick={() => claim("")} className="sm:flex-1">
+                    Claim someone else
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <ErrorNote error={error} />
+          </div>
+        </main>
+
+        <aside className="flex flex-col gap-6 min-w-0">
+          {mode !== "enroll" && showResults && (
+            <Card className="p-4.5 pb-5">
+              <h3 className="m-0 mb-3 font-display text-[17px] font-bold">What was measured</h3>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  [stats.count, "keystrokes"],
+                  [stats.duration, "duration"],
+                  [stats.wpm, "wpm"],
+                  [stats.dwell, "avg dwell"],
+                  [stats.flight, "avg flight"],
+                  [stats.backspaces, "backspaces"],
+                ].map(([value, label]) => (
+                  <div key={label} className="rounded-base border-2 border-ink px-2.5 py-2">
+                    <span className="block font-display text-xl font-bold leading-tight tabular-nums">{value}</span>
+                    <span className="text-xs text-ink-2">{label}</span>
+                  </div>
+                ))}
+              </div>
+              <div
+                className="mt-3.5 h-16 flex items-end gap-0.5 rounded-base border-2 border-ink bg-soft p-1"
+                role="img"
+                aria-label="Dwell time per keystroke"
+              >
+                {dwellValues.map((d, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 min-w-[2px] rounded-t-[2px] border-[1.5px] border-b-0 border-ink bg-mint"
+                    style={{ height: `${Math.max((d / maxDwell) * 100, 6)}%` }}
+                  />
+                ))}
+              </div>
+              <p className="m-0 mt-1.5 text-[13px] text-ink-2">Dwell time per keystroke, last prompt</p>
+              <div className="mt-3 flex gap-4">
+                <GhostButton onClick={() => setShowRaw((prev) => !prev)} className="text-ink underline">
+                  {showRaw ? "Hide raw event log" : "Show raw event log"}
+                </GhostButton>
+                {showRaw && (
+                  <GhostButton
+                    onClick={() => {
+                      navigator.clipboard.writeText(rawText);
+                      setCopyLabel("Copied");
+                      setTimeout(() => setCopyLabel("Copy JSON"), 1200);
+                    }}
+                    className="text-ink underline"
+                  >
+                    {copyLabel}
+                  </GhostButton>
+                )}
+              </div>
+              {showRaw && (
+                <pre className="m-0 mt-3 max-h-[220px] overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-base border-2 border-ink bg-soft p-3 font-mono text-xs leading-relaxed">
+                  {rawText}
+                </pre>
+              )}
+            </Card>
+          )}
+
+          {!enrolled && (
+            <Card className="p-4.5 pb-5">
+              <fieldset className="m-0 p-0 border-0">
+                <legend className="m-0 mb-3 p-0 font-display text-[17px] font-bold">Prompts to type</legend>
+                <div className="flex gap-2">
+                  {PROMPT_COUNTS.map((n) => (
+                    <label
+                      key={n}
+                      className={`grid place-items-center min-w-13 h-11 px-3.5 cursor-pointer rounded-base border-2 border-ink text-base font-bold tabular-nums transition-all duration-100 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-ink ${
+                        promptCount === n ? `${FILL[modeFill]} shadow-brutal` : "bg-white hover:shadow-brutal-sm"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="prompt-count"
+                        value={n}
+                        checked={promptCount === n}
+                        onChange={() => changePromptCount(n)}
+                        className="sr-only"
+                      />
+                      {n}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <p className="m-0 mt-2.5 text-[13px] text-ink-2">More prompts, steadier profile, fewer mistakes.</p>
+              {/* The cost of a snappy one-prompt identify, stated up front rather than discovered. */}
+              {mode === "identify" && identifyRates && (
+                <>
+                  <div className="mt-3.5 grid grid-cols-3 gap-2">
+                    {PROMPT_COUNTS.map((n) => (
+                      <div
+                        key={n}
+                        className={`rounded-base border-2 border-ink px-2.5 py-2 ${n === promptCount ? "bg-sun shadow-brutal-sm" : "bg-white"}`}
+                      >
+                        <span className="block font-display text-xl font-bold tabular-nums">
+                          {Math.round(identifyRates.found_percent[n])}%
+                        </span>
+                        <span className={`text-xs ${n === promptCount ? "text-ink" : "text-ink-2"}`}>
+                          found · {plural(n, "prompt")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="m-0 mt-2.5 text-[13px] leading-snug text-ink-2">
+                    With {plural(promptCount, "prompt")}, someone who isn't enrolled gets named about{" "}
+                    {Math.round(identifyRates.stranger_named_percent[promptCount])}% of the time.
+                  </p>
+                </>
+              )}
+            </Card>
+          )}
+
+          {!(mode !== "enroll" && showResults) && (
+            <Card className="p-4.5 pb-5">
+              <h3 className="m-0 mb-3 font-display text-[17px] font-bold">How it works</h3>
+              <ol className="m-0 p-0 list-none flex flex-col gap-3">
+                {HOW_IT_WORKS[mode].map((step, i) => (
+                  <li key={i} className="grid grid-cols-[28px_1fr] gap-3 text-sm leading-snug">
+                    <Tile size="size-7" fill={modeFill} className="text-[13px] font-bold">
+                      {i + 1}
+                    </Tile>
+                    <span className="pt-1">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          )}
+        </aside>
+      </div>
+
+      <footer className="mx-auto w-full max-w-[1160px] px-4 pb-8 sm:px-6 text-[13px] leading-relaxed text-ink-2">
+        Open-set 1:N gallery search on typing rhythm. New people enroll without retraining the model.
+      </footer>
+
+      {pendingDiscard && (
+        <Dialog
+          title={`Discard ${plural(sessionsRef.current.length, "recorded sample")}?`}
+          onDismiss={() => setPendingDiscard(null)}
+          actions={
+            <>
+              <Button fill="white" onClick={() => setPendingDiscard(null)} autoFocus>
+                Keep recording
+              </Button>
+              <Button
+                fill="coral"
+                onClick={() => {
                   const { run } = pendingDiscard;
                   setPendingDiscard(null);
                   sessionsRef.current = [];
                   run();
-                },
-              },
-            ]}
-          />
-        )}
-
-        {collision && (
-          <Choice
-            question={`Someone is already enrolled as ${name}. Replacing overwrites their stored typing profile for good.`}
-            actions={[
-              { label: "Use a different name", onClick: resetEnrollment },
-              {
-                label: `Replace ${name}`,
-                destructive: true,
-                onClick: () => sendEnrollment(collision.sessions, true),
-              },
-            ]}
-          />
-        )}
-
-        <Status status={status} />
-
-        {mode === "identify" && matches?.results.length > 0 && (
-          <div className="mt-7 animate-[rise_380ms_cubic-bezier(0.16,1,0.3,1)]">
-            <div className="flex items-baseline justify-between gap-3 mb-4">
-              <h2 className="m-0 font-display text-[17px] font-semibold tracking-tight">
-                {matches.matched ? "Ranked candidates" : "Closest candidates"}
-              </h2>
-              <span className="text-[12.5px] tabular-nums text-[var(--color-text-secondary)]">
-                threshold {matches.min_confidence.toFixed(2)} · {matches.query_prompts}{" "}
-                {matches.query_prompts === 1 ? "prompt" : "prompts"} · finds {Math.round(matches.found_percent)}%
-              </span>
-            </div>
-
-            <ol className="m-0 p-0 list-none flex flex-col gap-3.5">
-              {matches.results.map((r, i) => {
-                const band = confidenceBand(r.similarity, matches.min_confidence);
-                return (
-                  // Ranks 6-10 are context (how crowded it is just below the shortlist), so they recede.
-                  <li key={r.person_id} className={i >= SHORTLIST ? "opacity-45" : ""}>
-                    <div className="flex items-baseline gap-2">
-                      <span className="w-5 shrink-0 text-[13px] tabular-nums text-[var(--color-text-secondary)]">
-                        {i + 1}
-                      </span>
-                      <span className={`truncate ${i === 0 ? "text-[17px] font-semibold" : "text-[15px]"}`}>
-                        {r.name}
-                      </span>
-                      <span className="ml-auto text-[12.5px]" style={{ color: band.color }}>
-                        {band.label}
-                      </span>
-                      <span className="w-[46px] text-right text-[13px] tabular-nums text-[var(--color-text-secondary)]">
-                        {r.similarity.toFixed(3)}
-                      </span>
-                    </div>
-                    <div className="relative mt-1.5 ml-7 h-1.5 rounded-full bg-[var(--color-surface)] overflow-hidden">
-                      <div
-                        className="h-full rounded-full origin-left animate-[sweep_620ms_cubic-bezier(0.16,1,0.3,1)]"
-                        style={{ width: `${Math.max(r.similarity, 0) * 100}%`, background: band.color }}
-                      />
-                      {/* Notched in the card colour so the threshold stays readable across a filled bar. */}
-                      <span
-                        aria-hidden="true"
-                        className="absolute top-0 h-full w-0.5 bg-[var(--color-card)]"
-                        style={{ left: `${matches.min_confidence * 100}%` }}
-                      />
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-        )}
-
-        {mode === "authenticate" && auth && (
-          <div className="mt-7 animate-[rise_380ms_cubic-bezier(0.16,1,0.3,1)]">
-            <div
-              className="flex items-start gap-3"
-              style={{ color: auth.accepted ? "var(--color-accent)" : "var(--color-danger)" }}
-            >
-              <Icon path={auth.accepted ? icons.check : icons.declined} size={22} className="mt-1 shrink-0" />
-              <div className="min-w-0">
-                <h2 className="m-0 font-display text-[22px] font-semibold tracking-tight">
-                  {auth.accepted ? `Verified as ${auth.name}` : "Not verified"}
-                </h2>
-                <p className="m-0 mt-1.5 text-[14.5px] leading-snug text-[var(--color-text-secondary)]">
-                  {auth.accepted
-                    ? `This typing rhythm matches ${auth.name}'s stored profile closely enough to accept.`
-                    : `This typing rhythm isn't close enough to ${auth.name}'s stored profile to accept the claim.`}
-                </p>
-              </div>
-            </div>
-
-            {/* The decision is one number against one line — show both rather than just the verdict. */}
-            <div className="mt-5">
-              <div className="flex items-baseline justify-between text-[12.5px] tabular-nums text-[var(--color-text-secondary)]">
-                <span>similarity {auth.similarity.toFixed(3)}</span>
-                <span>
-                  threshold {auth.threshold.toFixed(2)} · {auth.operating_point} {auth.eer_percent}%
-                </span>
-              </div>
-              <div className="relative mt-1.5 h-2 rounded-full bg-[var(--color-surface)] overflow-hidden">
-                <div
-                  className="h-full rounded-full origin-left animate-[sweep_620ms_cubic-bezier(0.16,1,0.3,1)]"
-                  style={{
-                    width: `${Math.max(auth.similarity, 0) * 100}%`,
-                    background: auth.accepted ? "var(--color-accent)" : "var(--color-danger)",
-                  }}
-                />
-                <span
-                  aria-hidden="true"
-                  className="absolute top-0 h-full w-0.5 bg-[var(--color-card)]"
-                  style={{ left: `${auth.threshold * 100}%` }}
-                />
-              </div>
-              <p className="m-0 mt-3 text-[12.5px] leading-snug text-[var(--color-text-secondary)]">
-                {auth.name} enrolled from {auth.enroll_prompts}, verified with {auth.query_prompts}.{" "}
-                {auth.extrapolated
-                  ? `No measured threshold for ${auth.enroll_prompts} + ${auth.query_prompts} (Aalto has at most 15 prompts per person), so this borrows the 10 + 5 one.`
-                  : `At this setting, ${auth.eer_percent}% of decisions are wrong either way.`}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {enrolled && (
-          // Testing yourself is the point of enrolling, so it's the primary action and takes focus
-          // (Enter continues); enrolling someone else is the quieter alternative.
-          <div className="mt-6 flex flex-col gap-3">
-            <button onClick={() => switchMode("identify")} autoFocus className={primaryButton}>
-              Identify yourself now
-            </button>
-            <button onClick={resetEnrollment} className={ghostButton}>
-              Enroll another person
-            </button>
-          </div>
-        )}
-
-        <section
-          className={`${mode !== "enroll" && showResults ? "" : "hidden "}mt-9 pt-8 border-t border-[var(--color-border)]`}
+                }}
+              >
+                Discard
+              </Button>
+            </>
+          }
         >
-          <h2 className="m-0 mb-5 font-display text-[17px] font-semibold tracking-tight">What was measured</h2>
-
-          <div className="grid grid-cols-3 gap-x-3 gap-y-5">
-            {[
-              [stats.count, "keystrokes"],
-              [stats.duration, "duration"],
-              [stats.wpm, "wpm"],
-              [stats.dwell, "avg dwell"],
-              [stats.flight, "avg flight"],
-            ].map(([value, label]) => (
-              <div key={label} className="flex flex-col">
-                <span className="font-display text-[22px] font-semibold tracking-tight tabular-nums">{value}</span>
-                <span className="mt-0.5 text-xs text-[var(--color-text-secondary)]">{label}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-7 h-14 flex items-end gap-0.5" role="img" aria-label="Dwell time per keystroke">
-            {dwellValues.map((d, i) => (
-              <div
-                key={i}
-                className="flex-1 min-w-[2px] bg-[var(--color-accent-deep)] rounded-t-sm"
-                style={{ height: `${Math.max((d / maxDwell) * 100, 6)}%` }}
-              />
-            ))}
-          </div>
-
-          <div className="mt-5 flex gap-4">
-            <button
-              onClick={() => setShowRaw((prev) => !prev)}
-              className="border-0 bg-transparent text-[var(--color-accent)] font-sans text-[13px] font-medium cursor-pointer p-0 hover:underline"
-            >
-              {showRaw ? "Hide raw event log" : "Show raw event log"}
-            </button>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(rawText);
-                setCopyLabel("Copied");
-                setTimeout(() => setCopyLabel("Copy JSON"), 1200);
-              }}
-              className={`${showRaw ? "" : "hidden "}border-0 bg-transparent text-[var(--color-accent)] font-sans text-[13px] font-medium cursor-pointer p-0 hover:underline`}
-            >
-              {copyLabel}
-            </button>
-          </div>
-          <pre
-            className={`${showRaw ? "" : "hidden "}mt-3 max-h-[220px] overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words bg-[var(--color-bg)] rounded-xl p-4 font-mono text-xs leading-relaxed text-[var(--color-text)]`}
-          >
-            {rawText}
-          </pre>
-        </section>
-      </main>
-
-      <footer className="w-full max-w-[560px] text-[12.5px] leading-relaxed text-[var(--color-text-secondary)]">
-        Open-set 1:N gallery search on typing rhythm. New people enroll without retraining the model.
-      </footer>
+          {pendingDiscard.reason} The samples you've typed can't be recovered.
+        </Dialog>
+      )}
     </div>
   );
 }

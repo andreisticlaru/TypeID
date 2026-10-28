@@ -1,90 +1,75 @@
 @import "tailwindcss";
 
-/* Palette sampled from the brand mark (image.png): ink #161328, emerald #1D9E75, mint #5DCAA5.
-   One committed world, not a light/dark fork — the mark is dark, and a scanner reads right in ink. */
-:root {
-  --color-bg: #0d0b18;
-  --color-card: #161328;
-  --color-surface: #211d3b; /* raised chips and pills inside the card */
-  --color-text: #f4f3f8;
-  --color-text-secondary: #a8a5be; /* 7.6:1 on the card — placeholder and label safe */
-  --color-accent: #5dcaa5;
-  --color-accent-deep: #1d9e75;
-  --color-danger: #ff7a6b;
-  --color-caution: #e8b667; /* "declined to guess" is a correct outcome, not an error */
-  --color-border: #2b2745;
-  --shadow-card: 0 24px 70px rgba(0, 0, 0, 0.55);
-}
+/* Neobrutalism, after neobrutalism.dev (ekmas/neobrutalism-components, MIT): 2px ink borders, hard
+   offset shadows, a 5px radius and flat fills. Ink is the mark's #161328 rather than pure black, and
+   mint (the mark's inner ring) is the main colour. Each mode owns one fill so you can tell where you
+   are at a glance: enroll mint, identify sun, authenticate lilac. Coral is reserved for wrong
+   characters, rejections and destructive actions. `static` emits every variable, because JSX reads
+   some of them through inline styles that Tailwind can't see. */
+@theme static {
+  --color-ink: #161328;
+  --color-ink-2: #4b4763; /* secondary text, 8.9:1 on white */
+  --color-page: #e7f6ef;
+  --color-mint: #5dcaa5;
+  --color-mint-deep: #1d9e75;
+  --color-sun: #ffd23f;
+  --color-sun-soft: #fff8d6;
+  --color-lilac: #b4b9ff;
+  --color-coral: #ff6b6b;
+  --color-coral-soft: #ffe1e1;
+  --color-wash: #f1f0f6; /* empty tracks and bars */
+  --color-soft: #fbfbfd; /* the prompt box: a step off the white card */
+  --color-faint: #9a96ae; /* untyped characters: meant to recede */
+  --color-off: #e4e2ec; /* disabled fills */
 
-@theme {
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
-  --font-display: "Space Grotesk", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
+  --shadow-brutal-sm: 2px 2px 0 0 var(--color-ink);
+  --shadow-brutal: 4px 4px 0 0 var(--color-ink);
+  --shadow-brutal-lg: 6px 6px 0 0 var(--color-ink);
+  --shadow-brutal-xl: 8px 8px 0 0 var(--color-ink);
+
+  --radius-base: 5px;
+
+  --font-sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: "Space Grotesk", "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 html {
-  color-scheme: dark; /* browser chrome (scrollbars, form controls) joins the world */
+  color-scheme: light;
 }
 
+/* A faint grid on the mint wash: the page reads as a work surface, the cards sit on top of it. */
 body {
   -webkit-font-smoothing: antialiased;
+  font-weight: 500;
+  background-color: var(--color-page);
+  background-image:
+    linear-gradient(rgb(22 19 40 / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(22 19 40 / 0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
 
-/* Surfaces the browser draws for us still belong to the design. */
 ::selection {
-  background: color-mix(in srgb, var(--color-accent) 32%, transparent);
-  color: var(--color-text);
+  background: var(--color-mint);
+  color: var(--color-ink);
 }
 
-/* No border-radius here: it overrode the pills' rounded-full and snapped them to a rectangle
-   whenever they took focus. Tailwind's `transition` utility animates outline-color, so the ring
-   fades in from currentColor — expected, not a missing ring. */
+/* One focus treatment everywhere: an ink ring set off from the element by a page-coloured gap. */
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-ink);
   outline-offset: 3px;
-}
-
-/* Underline fields carry their own focus indicator; a ring around them reads as a browser
-   artifact on a borderless box. Doubling the rule keeps focus obvious without shifting layout. */
-input:focus-visible,
-textarea:focus-visible {
-  outline: none;
-  border-bottom-color: var(--color-accent);
-  box-shadow: 0 1px 0 0 var(--color-accent);
 }
 
 input,
 textarea {
-  caret-color: var(--color-accent);
+  caret-color: var(--color-ink);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-border) transparent;
+  scrollbar-color: var(--color-ink) transparent;
 }
 
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border: 3px solid transparent;
-  background-clip: content-box;
-  border-radius: 999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-accent-deep);
-  background-clip: content-box;
-}
-
-/* The one authored moment: the mark's rings are a scan, so they scan while the model does. */
+/* The mark's rings scan while the model works. */
 @keyframes scan-cw {
   to {
     transform: rotate(360deg);
