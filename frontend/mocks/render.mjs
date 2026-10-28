@@ -1,4 +1,4 @@
-// Renders every screen in mocks.html to png/. Run from the repo root: node design/mocks/render.mjs
+// Renders every screen in mocks.html to png/. Run from the repo root: node frontend/mocks/render.mjs
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -25,5 +25,10 @@ for (const s of screens) await shoot(desktop, s, false, `${s}.png`);
 const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
 for (const s of ["02-enroll-typing", "07-identify-match", "10-auth-verified"]) await shoot(phone, s, true, `m-${s}.png`);
 
+// Style study: the identify-match screen in Frutiger Aero, for comparison.
+await desktop.goto(`file://${path.join(dir, "aero.html")}`);
+await desktop.evaluate(() => document.fonts.ready);
+await desktop.screenshot({ path: path.join(dir, "png", "aero-07-identify-match.png"), fullPage: true });
+
 await browser.close();
-console.log(`rendered ${screens.length} desktop + 3 mobile screens`);
+console.log(`rendered ${screens.length} desktop + 3 mobile screens + 1 aero study`);
