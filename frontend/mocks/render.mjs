@@ -30,5 +30,11 @@ await desktop.goto(`file://${path.join(dir, "aero.html")}`);
 await desktop.evaluate(() => document.fonts.ready);
 await desktop.screenshot({ path: path.join(dir, "png", "aero-07-identify-match.png"), fullPage: true });
 
+// Logo review sheet (frontend/mocks/logo/make-logo.mjs writes it).
+const sheet = await browser.newPage({ viewport: { width: 1500, height: 900 }, deviceScaleFactor: 1.5 });
+await sheet.goto(`file://${path.join(dir, "logo", "sheet.html")}`);
+await sheet.evaluate(() => document.fonts.ready);
+await sheet.screenshot({ path: path.join(dir, "png", "logo-sheet.png"), fullPage: true });
+
 await browser.close();
 console.log(`rendered ${screens.length} desktop + 3 mobile screens + 1 aero study`);

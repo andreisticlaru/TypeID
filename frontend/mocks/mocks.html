@@ -101,7 +101,7 @@ p { margin: 0; }
 .topbar { background: var(--card); border-bottom: 2px solid var(--ink); }
 .topbar .in { max-width: 1160px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 24px; }
 .brand { display: flex; align-items: center; gap: 12px; }
-.brand img { width: 44px; height: 44px; border: 2px solid var(--ink); border-radius: 9px; box-shadow: 3px 3px 0 var(--ink); background: var(--ink); }
+.brand img { width: 48px; height: 48px; filter: drop-shadow(3px 3px 0 var(--ink)); }
 .brand .name { font: 700 24px/1 "Space Grotesk", sans-serif; }
 .brand .tag { font-size: 13px; color: var(--ink-2); margin-top: 3px; }
 .tabs { margin-left: auto; display: flex; gap: 6px; padding: 5px; border: 2px solid var(--ink); border-radius: var(--r); background: var(--bg); }
@@ -224,7 +224,7 @@ body.m .footer { padding: 0 16px 28px; }
 <body>
 <div id="app"></div>
 <script>
-const MARK = "../public/mark.png";
+const MARK = "logo/favicon-mint.svg"; // the one-ring mark: the two-ring one is for 96 px and up
 const ic = {
   check: '<path d="M3 8.5l3.2 3.2L13 5"/>',
   alert: '<path d="M8 4.5v4M8 11.5h.01M8 1.8l6 11H2z"/>',
