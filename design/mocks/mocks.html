@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TypeID mocks</title>
+<style>
+/* Static design mocks for the neobrutalist redesign. Component styling follows neobrutalism.dev
+   (ekmas/neobrutalism-components, MIT): 2px ink borders, hard 4px offset shadows, 5px radius,
+   flat saturated fills. Rendered to PNG by render.mjs; open with ?screen=<id> to view one. */
+@font-face { font-family: "DM Sans"; font-weight: 400; src: url(fonts/dm-sans-latin-400-normal.woff2); }
+@font-face { font-family: "DM Sans"; font-weight: 500; src: url(fonts/dm-sans-latin-500-normal.woff2); }
+@font-face { font-family: "DM Sans"; font-weight: 700; src: url(fonts/dm-sans-latin-700-normal.woff2); }
+@font-face { font-family: "Space Grotesk"; font-weight: 500; src: url(fonts/space-grotesk-latin-500-normal.woff2); }
+@font-face { font-family: "Space Grotesk"; font-weight: 700; src: url(fonts/space-grotesk-latin-700-normal.woff2); }
+
+:root {
+  --ink: #161328;          /* borders, shadows, text: the mark's ink instead of pure black */
+  --ink-2: #4b4763;        /* secondary text, 8.9:1 on white */
+  --bg: #e7f6ef;           /* page: a wash of the mint */
+  --card: #ffffff;
+  --mint: #5dcaa5;         /* main: the mark's inner ring */
+  --mint-deep: #1d9e75;
+  --sun: #ffd23f;          /* identify */
+  --lilac: #b4b9ff;        /* authenticate */
+  --coral: #ff6b6b;        /* danger, wrong characters */
+  --shadow: 4px 4px 0 0 var(--ink);
+  --shadow-lg: 6px 6px 0 0 var(--ink);
+  --r: 5px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; color: var(--ink); font: 500 15px/1.5 "DM Sans", sans-serif;
+  background-color: var(--bg);
+  background-image: linear-gradient(rgba(22,19,40,.06) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(22,19,40,.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, .display { font-family: "Space Grotesk", sans-serif; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+p { margin: 0; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---- primitives (neobrutalism.dev: button, card, badge, input, textarea, progress, alert, toggle, kbd) ---- */
+.box { background: var(--card); border: 2px solid var(--ink); border-radius: var(--r); box-shadow: var(--shadow); }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px;
+  border: 2px solid var(--ink); border-radius: var(--r); background: var(--mint); color: var(--ink);
+  font: 700 15px "DM Sans", sans-serif; box-shadow: var(--shadow); cursor: pointer; white-space: nowrap;
+}
+.btn.lg { height: 54px; font-size: 17px; width: 100%; }
+.btn.neutral { background: var(--card); }
+.btn.sun { background: var(--sun); }
+.btn.lilac { background: var(--lilac); }
+.btn.coral { background: var(--coral); }
+.btn.ghost { background: transparent; box-shadow: none; border-color: transparent; padding: 0 6px; height: 32px; color: var(--ink-2); }
+.btn.disabled { background: #e4e2ec; color: #6d6985; box-shadow: none; border-style: dashed; }
+.btn.pressed { transform: translate(4px, 4px); box-shadow: none; }
+.btn.icon { width: 44px; padding: 0; }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border: 2px solid var(--ink);
+  border-radius: var(--r); background: var(--card); font: 700 12.5px "DM Sans", sans-serif; white-space: nowrap;
+}
+.badge.mint { background: var(--mint); } .badge.sun { background: var(--sun); }
+.badge.lilac { background: var(--lilac); } .badge.coral { background: var(--coral); }
+.badge.ink { background: var(--ink); color: #fff; }
+.kbd {
+  display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border: 2px solid var(--ink);
+  border-radius: var(--r); background: var(--card); font: 700 11.5px "DM Sans", sans-serif; box-shadow: 2px 2px 0 var(--ink);
+}
+.label { font: 700 12px "DM Sans", sans-serif; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); }
+.input {
+  width: 100%; height: 52px; padding: 0 14px; border: 2px solid var(--ink); border-radius: var(--r);
+  background: var(--card); font: 500 18px "DM Sans", sans-serif; color: var(--ink);
+}
+.input.focus, .textarea.focus { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--ink); }
+.placeholder { color: #8d89a3; }
+.textarea {
+  width: 100%; min-height: 108px; padding: 12px 14px; border: 2px solid var(--ink); border-radius: var(--r);
+  background: var(--card); font: 500 18px/1.55 "DM Sans", sans-serif;
+}
+.caret { display: inline-block; width: 2px; height: 22px; background: var(--ink); vertical-align: -4px; margin-left: 1px; }
+.toggle { display: flex; gap: 8px; }
+.toggle .t {
+  min-width: 52px; height: 44px; display: grid; place-items: center; padding: 0 14px; border: 2px solid var(--ink);
+  border-radius: var(--r); background: var(--card); font: 700 16px "DM Sans", sans-serif;
+}
+.toggle .t.on { background: var(--mint); box-shadow: var(--shadow); }
+.alert { display: grid; grid-template-columns: 22px 1fr; gap: 4px 12px; padding: 14px 16px; border: 2px solid var(--ink);
+  border-radius: var(--r); box-shadow: var(--shadow); }
+.alert .t { font-weight: 700; }
+.alert svg { margin-top: 2px; }
+.stack { display: flex; flex-direction: column; }
+.row { display: flex; align-items: center; }
+.gap4 { gap: 4px; } .gap8 { gap: 8px; } .gap12 { gap: 12px; } .gap16 { gap: 16px; } .gap20 { gap: 20px; } .gap24 { gap: 24px; }
+.muted { color: var(--ink-2); }
+.small { font-size: 13px; }
+.grow { flex: 1; min-width: 0; }
+
+/* ---- shell ---- */
+.topbar { background: var(--card); border-bottom: 2px solid var(--ink); }
+.topbar .in { max-width: 1160px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 24px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand img { width: 44px; height: 44px; border: 2px solid var(--ink); border-radius: 9px; box-shadow: 3px 3px 0 var(--ink); background: var(--ink); }
+.brand .name { font: 700 24px/1 "Space Grotesk", sans-serif; }
+.brand .tag { font-size: 13px; color: var(--ink-2); margin-top: 3px; }
+.tabs { margin-left: auto; display: flex; gap: 6px; padding: 5px; border: 2px solid var(--ink); border-radius: var(--r); background: var(--bg); }
+.tabs .tab { height: 36px; padding: 0 16px; display: inline-flex; align-items: center; gap: 8px; border: 2px solid transparent;
+  border-radius: var(--r); font: 700 14.5px "DM Sans", sans-serif; color: var(--ink-2); }
+.tabs .tab.on { border-color: var(--ink); color: var(--ink); box-shadow: 2px 2px 0 var(--ink); }
+.tabs .tab .dot { width: 10px; height: 10px; border: 2px solid var(--ink); border-radius: 50%; }
+.page { max-width: 1160px; margin: 0 auto; padding: 32px 24px 48px; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; align-items: start; }
+.footer { max-width: 1160px; margin: 0 auto; padding: 0 24px 40px; font-size: 13px; color: var(--ink-2); }
+
+/* ---- task card ---- */
+.task { background: var(--card); border: 2px solid var(--ink); border-radius: var(--r); box-shadow: var(--shadow-lg); }
+.task-head { display: flex; align-items: center; gap: 14px; padding: 16px 24px; border-bottom: 2px solid var(--ink); border-radius: 3px 3px 0 0; }
+.task-head h2 { font-size: 24px; }
+.task-head .step { margin-left: auto; }
+.task-body { padding: 26px 24px 28px; }
+.mode-mark { width: 38px; height: 38px; display: grid; place-items: center; border: 2px solid var(--ink); border-radius: var(--r); background: var(--card); }
+
+.prompt { position: relative; border: 2px solid var(--ink); border-radius: var(--r); padding: 20px 64px 20px 20px; background: #fbfbfd; }
+.prompt .sentence { font: 500 27px/1.42 "Space Grotesk", sans-serif; letter-spacing: -0.01em; }
+.prompt .swap { position: absolute; top: 12px; right: 12px; }
+.c-ok { color: var(--ink); }
+.c-bad { background: var(--coral); color: var(--ink); border-radius: 2px; box-shadow: inset 0 -2px 0 var(--ink); }
+.c-todo { color: #9a96ae; }
+.c-cur { color: #9a96ae; box-shadow: inset 0 -4px 0 var(--mint-deep); }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+
+.segs { display: flex; gap: 6px; }
+.segs i { width: 34px; height: 14px; border: 2px solid var(--ink); border-radius: 3px; background: var(--card); }
+.segs i.done { background: var(--mint); }
+.segs i.cur { background: repeating-linear-gradient(-45deg, var(--mint) 0 4px, var(--card) 4px 8px); }
+
+/* ---- rail ---- */
+.rail { display: flex; flex-direction: column; gap: 22px; }
+.rail .box { padding: 18px 18px 20px; }
+.rail h3 { font-size: 17px; margin-bottom: 12px; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.steps li { display: grid; grid-template-columns: 28px 1fr; gap: 12px; font-size: 14px; line-height: 1.45; }
+.steps .n { width: 28px; height: 28px; display: grid; place-items: center; border: 2px solid var(--ink); border-radius: var(--r); font: 700 13px "DM Sans"; }
+.rates { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.rate { border: 2px solid var(--ink); border-radius: var(--r); padding: 8px 10px; background: var(--card); }
+.rate.on { background: var(--sun); box-shadow: 3px 3px 0 var(--ink); }
+.rate b { display: block; font: 700 20px "Space Grotesk"; }
+.rate span { font-size: 12px; color: var(--ink-2); }
+.rate.on span { color: var(--ink); }
+
+/* ---- results ---- */
+.verdict { border: 2px solid var(--ink); border-radius: var(--r); box-shadow: var(--shadow); padding: 18px 20px; display: flex; align-items: center; gap: 16px; }
+.verdict .big { font: 700 30px/1.1 "Space Grotesk"; }
+.stamp { font: 700 13px "DM Sans"; letter-spacing: .1em; text-transform: uppercase; padding: 4px 10px; border: 2px solid var(--ink); border-radius: var(--r); background: var(--card); transform: rotate(-3deg); box-shadow: 2px 2px 0 var(--ink); }
+.ranks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.rank { display: grid; grid-template-columns: 34px minmax(0, 150px) 1fr 74px; align-items: center; gap: 14px; padding: 10px 12px; border: 2px solid var(--ink); border-radius: var(--r); background: var(--card); }
+.rank.top { background: #fff8d6; box-shadow: var(--shadow); }
+.rank.fade { opacity: .45; border-style: dashed; }
+.rank .pos { width: 34px; height: 34px; display: grid; place-items: center; border: 2px solid var(--ink); border-radius: var(--r); font: 700 15px "Space Grotesk"; background: var(--card); }
+.rank.top .pos { background: var(--sun); }
+.rank .who { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank .score { text-align: right; font: 700 15px "Space Grotesk"; }
+.track { position: relative; height: 18px; border: 2px solid var(--ink); border-radius: 3px; background: #f1f0f6; overflow: visible; }
+.track .fill { height: 100%; border-right: 2px solid var(--ink); }
+.track .thr { position: absolute; top: -6px; bottom: -6px; width: 0; border-left: 2px dashed var(--ink); }
+.thr-label { position: relative; height: 18px; font: 700 11.5px "DM Sans"; }
+.thr-label span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { border: 2px solid var(--ink); border-radius: var(--r); padding: 8px 10px; }
+.stat b { display: block; font: 700 20px/1.2 "Space Grotesk"; }
+.stat span { font-size: 12px; color: var(--ink-2); }
+.bars { display: flex; align-items: flex-end; gap: 2px; height: 64px; margin-top: 14px; padding: 4px; border: 2px solid var(--ink); border-radius: var(--r); background: #fbfbfd; }
+.bars i { flex: 1; background: var(--mint); border: 1.5px solid var(--ink); border-bottom: 0; border-radius: 2px 2px 0 0; }
+.link { font-weight: 700; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+
+.people { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.person { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 2px solid var(--ink); border-radius: var(--r); background: var(--card); }
+.person.on { background: var(--lilac); box-shadow: var(--shadow); }
+.avatar { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border: 2px solid var(--ink); border-radius: var(--r); font: 700 15px "Space Grotesk"; background: var(--card); }
+.person .nm { font-weight: 700; }
+.person .sub { font-size: 12px; color: var(--ink-2); }
+
+.gauge { position: relative; height: 30px; border: 2px solid var(--ink); border-radius: var(--r); background: #f1f0f6; }
+.gauge .fill { height: 100%; border-right: 2px solid var(--ink); border-radius: 3px 0 0 3px; }
+.gauge .thr { position: absolute; top: -9px; bottom: -9px; border-left: 3px solid var(--ink); }
+
+.overlay { position: fixed; inset: 0; background: rgba(22,19,40,.55); display: grid; place-items: center; }
+.dialog { width: 460px; background: var(--card); border: 2px solid var(--ink); border-radius: var(--r); box-shadow: 8px 8px 0 var(--ink); }
+.dialog .hd { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 2px solid var(--ink); background: var(--coral); border-radius: 3px 3px 0 0; }
+.dialog .bd { padding: 18px; }
+
+/* ---- map ---- */
+.mapwrap { max-width: 1160px; margin: 0 auto; padding: 28px 24px 48px; }
+.mapgrid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+.chip { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border: 2px solid var(--ink); border-radius: var(--r); background: var(--card); font: 700 13.5px "DM Sans"; }
+.chip.on { box-shadow: 3px 3px 0 var(--ink); background: #fff8d6; }
+.sw { width: 12px; height: 12px; border: 2px solid var(--ink); border-radius: 50%; }
+.vec { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+.vec span { height: 18px; border: 1.5px solid var(--ink); border-radius: 2px; }
+
+/* ---- mobile ---- */
+body.m .topbar .in { flex-wrap: wrap; padding: 12px 16px; gap: 12px; }
+body.m .brand .tag { display: none; }
+body.m .tabs { margin-left: 0; width: 100%; order: 3; }
+body.m .tabs .tab { flex: 1; justify-content: center; padding: 0 6px; }
+body.m .page { grid-template-columns: 1fr; padding: 20px 16px 32px; gap: 22px; }
+body.m .task-body { padding: 20px 16px 22px; }
+body.m .task-head { padding: 14px 16px; }
+body.m .prompt .sentence { font-size: 22px; }
+body.m .rank { grid-template-columns: 30px minmax(0, 1fr) 62px; grid-template-areas: "pos who score" "bar bar bar"; }
+body.m .rank .pos { grid-area: pos; } body.m .rank .who { grid-area: who; }
+body.m .rank .score { grid-area: score; } body.m .rank .track { grid-area: bar; }
+body.m .thr-label { margin: 0 12px 4px 12px !important; }
+body.m .verdict { flex-wrap: wrap; padding: 16px; }
+body.m .verdict .big { font-size: 24px; }
+body.m .verdict > div[style*="text-align:right"] { text-align: left !important; width: 100%; display: flex; align-items: center; gap: 12px; }
+body.m .verdict .stamp { margin-top: 0 !important; }
+body.m .task-head h2 { font-size: 20px; }
+body.m .people { grid-template-columns: 1fr 1fr; }
+body.m .footer { padding: 0 16px 28px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const MARK = "../../frontend/public/mark.png";
+const ic = {
+  check: '<path d="M3 8.5l3.2 3.2L13 5"/>',
+  alert: '<path d="M8 4.5v4M8 11.5h.01M8 1.8l6 11H2z"/>',
+  declined: '<path d="M8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12zM5.2 5.2l5.6 5.6"/>',
+  refresh: '<path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2v3h-3"/>',
+  external: '<path d="M6 10l5-5M6.5 5H11v4.5"/>',
+  back: '<path d="M9.5 3.5L5 8l4.5 4.5"/>',
+  arrow: '<path d="M3 8h10M9 4l4 4-4 4"/>',
+  user: '<path d="M8 8a2.6 2.6 0 1 0 0-5.2A2.6 2.6 0 0 0 8 8zM3 14c.6-2.6 2.6-4 5-4s4.4 1.4 5 4"/>',
+  search: '<path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM10.6 10.6L14 14"/>',
+  shield: '<path d="M8 1.8l5 2v4c0 3-2.2 5.2-5 6.4C5.2 13 3 10.8 3 7.8v-4z"/><path d="M5.8 8l1.6 1.6L10.4 6.6"/>',
+  map: '<path d="M1.8 3.8l4-1.6 4.4 1.6 4-1.6v10l-4 1.6-4.4-1.6-4 1.6zM5.8 2.2v10M10.2 3.8v10"/>',
+};
+const I = (n, s = 16, w = 2) => `<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true">${ic[n]}</svg>`;
+
+const MODES = {
+  enroll: { label: "Enroll", color: "var(--mint)", icon: "user", btn: "" },
+  identify: { label: "Identify", color: "var(--sun)", icon: "search", btn: "sun" },
+  authenticate: { label: "Authenticate", color: "var(--lilac)", icon: "shield", btn: "lilac" },
+};
+
+function topbar(mode) {
+  const tabs = Object.entries(MODES).map(([k, m]) =>
+    `<span class="tab ${k === mode ? "on" : ""}" style="${k === mode ? `background:${m.color}` : ""}">
+       ${I(m.icon, 15)}${m.label}</span>`).join("");
+  return `<header class="topbar"><div class="in">
+    <div class="brand"><img src="${MARK}" alt=""><div><div class="name">TypeID</div>
+      <div class="tag">Recognizes you by <b>how</b> you type, not what you type.</div></div></div>
+    <nav class="tabs">${tabs}</nav>
+    <span class="btn neutral" style="height:46px">${I("map")}Map${I("external", 14)}</span>
+  </div></header>`;
+}
+
+function taskHead(mode, title, right = "") {
+  const m = MODES[mode];
+  return `<div class="task-head" style="background:${m.color}">
+    <span class="mode-mark">${I(m.icon, 18)}</span><h2>${title}</h2><span class="step">${right}</span></div>`;
+}
+
+function sentence(text, typedLen, wrong = []) {
+  return [...text].map((ch, i) => {
+    const cls = i < typedLen ? (wrong.includes(i) ? "c-bad" : "c-ok") : i === typedLen ? "c-cur" : "c-todo";
+    return `<span class="${cls}">${ch === " " ? "&nbsp;" : ch}</span>`;
+  }).join("").replace(/&nbsp;/g, " ");
+}
+
+function promptBlock(text, typedLen, wrong, typed, meta) {
+  if (typed) { typedLen = typed.length; wrong = [...typed].flatMap((c, i) => (c === text[i] ? [] : [i])); }
+  return `<div class="prompt"><div class="label" style="margin-bottom:8px">Type this</div>
+      <div class="sentence">${sentence(text, typedLen, wrong)}</div>
+      <span class="btn neutral icon swap" title="Swap sentence">${I("refresh")}</span></div>
+    <div class="textarea focus" style="margin-top:18px">${typed ? typed + '<span class="caret"></span>' : '<span class="caret"></span><span class="placeholder">Start typing… pasting is off, the rhythm is the point</span>'}</div>
+    <div class="meta">${meta}</div>`;
+}
+
+function segs(done, total) {
+  return `<div class="row gap12"><div class="segs">${Array.from({ length: total }, (_, i) =>
+    `<i class="${i < done ? "done" : i === done ? "cur" : ""}"></i>`).join("")}</div>
+    <span class="small" style="font-weight:700">${done + 1} of ${total}</span></div>`;
+}
+
+function promptsCard(mode, n, rates = true) {
+  const t = [1, 5, 10].map((k) => `<span class="t ${k === n ? "on" : ""}" style="${k === n ? `background:${MODES[mode].color}` : ""}">${k}</span>`).join("");
+  const ratesHtml = mode === "identify" && rates ? `<div class="rates">${[[1, 52, 22], [5, 88, 19], [10, 93, 18]].map(([k, f, s]) =>
+    `<div class="rate ${k === n ? "on" : ""}"><b>${f}%</b><span>found · ${k} prompt${k > 1 ? "s" : ""}</span></div>`).join("")}</div>
+    <p class="small muted" style="margin-top:10px">With ${n} prompt${n > 1 ? "s" : ""}, someone who isn't enrolled gets named about ${n === 1 ? 22 : n === 5 ? 19 : 18}% of the time.</p>` : "";
+  return `<section class="box"><h3>Prompts to type</h3>
+    <div class="toggle">${t}</div>
+    <p class="small muted" style="margin-top:10px">More prompts, steadier profile, fewer mistakes.</p>${ratesHtml}</section>`;
+}
+
+function howCard(mode) {
+  const s = {
+    enroll: ["Pick a name for your profile.", "Type each sentence as it appears. Only the timing between keys is kept, never the text.", "Your prompts are averaged into one 128-number profile in the gallery."],
+    identify: ["Type the sentence. No name needed.", "TypeID ranks your rhythm against everyone enrolled, 500 Aalto people included.", "If nobody clears the threshold, it says so instead of guessing."],
+    authenticate: ["Claim an enrolled identity.", "Type the sentence to prove it.", "One score against one threshold: accept or reject."],
+  }[mode];
+  return `<section class="box"><h3>How it works</h3><ol class="steps">${s.map((t, i) =>
+    `<li><span class="n" style="background:${MODES[mode].color}">${i + 1}</span><span>${t}</span></li>`).join("")}</ol></section>`;
+}
+
+function measuredCard() {
+  const d = [96,88,104,79,92,121,85,99,110,77,94,102,87,130,91,83,97,108,76,95,89,115,93,86,101,98,82,107,90,96,112,84,99,87,103,94,80,118,92,88];
+  const max = Math.max(...d);
+  return `<section class="box"><h3>What was measured</h3>
+    <div class="stats">${[["41", "keystrokes"], ["9.8s", "duration"], ["49", "wpm"], ["96ms", "avg dwell"], ["148ms", "avg flight"], ["2", "backspaces"]].map(([v, l]) =>
+      `<div class="stat"><b class="num">${v}</b><span>${l}</span></div>`).join("")}</div>
+    <div class="bars" role="img" aria-label="Dwell time per keystroke">${d.map((v) => `<i style="height:${(v / max) * 100}%"></i>`).join("")}</div>
+    <p class="small muted" style="margin-top:6px">Dwell time per keystroke</p>
+    <p style="margin-top:12px"><span class="link small">Show raw event log</span></p></section>`;
+}
+
+function shell(mode, main, rail, extra = "") {
+  return topbar(mode) + `<div class="page"><main>${main}</main><aside class="rail">${rail}</aside></div>
+    <footer class="footer">Open-set 1:N gallery search on typing rhythm. New people enroll without retraining the model.</footer>` + extra;
+}
+
+const S1 = "Please send the revised budget to the whole team before Friday.";
+const S2 = "The meeting room on the third floor is booked until noon.";
+
+function ranks(rows, thr, matched) {
+  const label = `<div class="thr-label" style="margin:0 74px 4px 198px"><span style="left:${thr * 100}%">threshold ${thr.toFixed(2)}</span></div>`;
+  return label + `<ol class="ranks">${rows.map(([n, s], i) => {
+    const color = s >= thr ? (i === 0 && matched ? "var(--sun)" : "var(--mint)") : "#c9c6d8";
+    return `<li class="rank ${i === 0 ? "top" : ""} ${i >= 5 ? "fade" : ""}"><span class="pos">${i + 1}</span>
+      <span class="who">${n}</span>
+      <div class="track"><div class="fill" style="width:${s * 100}%;background:${color}"></div><span class="thr" style="left:${thr * 100}%"></span></div>
+      <span class="score num">${s.toFixed(3)}</span></li>`;
+  }).join("")}</ol>`;
+}
+
+const screens = {
+  "01-enroll-name": () => shell("enroll",
+    `<div class="task">${taskHead("enroll", "Enroll", '<span class="badge">Step 1 of 2</span>')}
+      <div class="task-body stack gap20">
+        <p style="font-size:17px">Enrolling records your rhythm across <b>5 short sentences</b>. Nothing you type is stored as text, only the timing between keys.</p>
+        <div class="stack gap8"><label class="label">Your name</label>
+          <div class="input focus row" style="font-size:18px">Andrei<span class="caret" style="margin-left:2px"></span></div></div>
+        <span class="btn lg">Start enrollment ${I("arrow")}</span>
+        <p class="small muted row gap8">Press <span class="kbd">Enter ↵</span> to start</p>
+      </div></div>`,
+    promptsCard("enroll", 5) + howCard("enroll")),
+
+  "02-enroll-typing": () => shell("enroll",
+    `<div class="task">${taskHead("enroll", "Enrolling Andrei", '<span class="btn ghost small">' + I("back", 14) + 'Change name</span>')}
+      <div class="task-body stack gap20">
+        ${segs(2, 5)}
+        <div>${promptBlock(S1, 38, [24], "Please send the revised budget ti the wh", `<span class="badge">41 keystrokes</span><span class="badge mint">97% match</span><span class="small muted" style="margin-left:auto">90% match needed</span>`)}</div>
+        <span class="btn lg">Next sentence ${I("arrow")}</span>
+        <p class="small muted row gap8"><span class="kbd">Enter ↵</span> submits · Enter is never part of the sample</p>
+      </div></div>`,
+    promptsCard("enroll", 5) + howCard("enroll")),
+
+  "03-enroll-done": () => shell("enroll",
+    `<div class="task">${taskHead("enroll", "Enroll", '<span class="badge">Step 2 of 2</span>')}
+      <div class="task-body stack gap24">
+        <div class="verdict" style="background:var(--mint)"><span class="mode-mark" style="width:54px;height:54px">${I("check", 28, 2.4)}</span>
+          <div class="grow"><div class="big">Andrei is enrolled</div><p style="margin-top:4px">Profile built from 5 typing samples.</p></div><span class="stamp">Saved</span></div>
+        <p class="muted">Testing yourself is the point of enrolling: identify yourself now, without saying who you are.</p>
+        <div class="stack gap12"><span class="btn lg sun">${I("search")} Identify yourself now</span><span class="btn lg neutral">Enroll another person</span></div>
+      </div></div>`,
+    howCard("enroll")),
+
+  "04-enroll-collision": () => shell("enroll",
+    `<div class="task">${taskHead("enroll", "Enrolling Andrei", '<span class="badge">5 of 5 recorded</span>')}
+      <div class="task-body stack gap20">
+        ${segs(5, 5).replace("6 of 5", "5 of 5")}
+        <div class="alert" style="background:#ffe1e1">${I("alert", 18)}<div class="stack gap4"><span class="t">Someone is already enrolled as Andrei</span>
+          <span>Replacing overwrites their stored typing profile for good. Your 5 samples are kept until you choose.</span>
+          <div class="row gap12" style="margin-top:10px"><span class="btn neutral">Use a different name</span><span class="btn coral">Replace Andrei</span></div></div></div>
+      </div></div>`,
+    promptsCard("enroll", 5) + howCard("enroll")),
+
+  "05-enroll-discard": () => screens["02-enroll-typing"]().replace("</footer>", "</footer>") +
+    `<div class="overlay"><div class="dialog"><div class="hd">${I("alert", 18)}<h3 style="font-size:18px">Discard 2 recorded samples?</h3></div>
+      <div class="bd stack gap16"><p>Switching to Identify drops the samples you've typed. They can't be recovered.</p>
+      <div class="row gap12" style="justify-content:flex-end"><span class="btn neutral">Keep recording</span><span class="btn coral">Discard</span></div></div></div></div>`,
+
+  "06-identify-typing": () => shell("identify",
+    `<div class="task">${taskHead("identify", "Who is typing?", '<span class="badge">1 prompt</span>')}
+      <div class="task-body stack gap20">
+        <p style="font-size:17px">Type the sentence and TypeID ranks your rhythm against <b>everyone enrolled</b>.</p>
+        <div>${promptBlock(S2, 21, [], "The meeting room on t", `<span class="badge">21 keystrokes · 9 more to go</span><span class="badge mint">100% match</span>`)}</div>
+        <span class="btn lg disabled">Identify me</span>
+      </div></div>`,
+    promptsCard("identify", 1) + howCard("identify")),
+
+  "07-identify-match": () => shell("identify",
+    `<div class="task">${taskHead("identify", "Who is typing?", '<span class="badge">1 prompt · threshold 0.75</span>')}
+      <div class="task-body stack gap24">
+        <div class="verdict" style="background:var(--sun)"><span class="avatar" style="width:54px;height:54px;font-size:24px">A</span>
+          <div class="grow"><span class="label" style="color:var(--ink)">Best match</span><div class="big">Andrei</div></div>
+          <div style="text-align:right"><div class="big num">0.912</div><span class="stamp" style="display:inline-block;margin-top:6px">Strong match</span></div></div>
+        <div><div class="row" style="justify-content:space-between;margin-bottom:10px"><h3 style="font-size:18px">Ranked candidates</h3><span class="small muted">finds 52% with 1 prompt</span></div>
+        ${ranks([["Andrei", .912], ["aalto_10482", .741], ["Maria", .733], ["aalto_88213", .702], ["aalto_51120", .688], ["aalto_30117", .671], ["aalto_77302", .664]], .75, true)}</div>
+        <span class="btn lg sun">Try another sentence ${I("arrow")}</span>
+      </div></div>`,
+    measuredCard() + promptsCard("identify", 1)),
+
+  "08-identify-nomatch": () => shell("identify",
+    `<div class="task">${taskHead("identify", "Who is typing?", '<span class="badge">1 prompt · threshold 0.75</span>')}
+      <div class="task-body stack gap24">
+        <div class="verdict" style="background:#fff3c4"><span class="mode-mark" style="width:54px;height:54px">${I("declined", 26, 2.2)}</span>
+          <div class="grow"><div class="big">No confident match</div><p style="margin-top:4px">Nobody reached the 0.75 threshold, so TypeID declined to name anyone. That's a correct outcome for someone who isn't enrolled.</p></div></div>
+        <div><h3 style="font-size:18px;margin-bottom:10px">Closest candidates</h3>
+        ${ranks([["aalto_10482", .711], ["Maria", .702], ["aalto_88213", .694], ["aalto_51120", .672], ["Andrei", .661]], .75, false)}</div>
+        <div class="row gap12"><span class="btn lg sun" style="flex:1">Try another sentence</span><span class="btn lg neutral" style="flex:1">Use 5 prompts</span></div>
+      </div></div>`,
+    measuredCard() + promptsCard("identify", 1)),
+
+  "09-auth-claim": () => shell("authenticate",
+    `<div class="task">${taskHead("authenticate", "Prove who you are", '<span class="badge">Step 1 of 2</span>')}
+      <div class="task-body stack gap20">
+        <p style="font-size:17px">Verification is a yes/no question, not a search: claim an identity, type the sentence, and TypeID compares your rhythm with that one profile.</p>
+        <div class="stack gap12"><span class="label">Who do you claim to be?</span>
+        <div class="people">${[["Andrei", 5, true], ["Maria", 5], ["Jonas", 10], ["Lea", 1], ["Tom", 5], ["Sofia", 5]].map(([n, p, on]) =>
+          `<div class="person ${on ? "on" : ""}"><span class="avatar">${n[0]}</span><div><div class="nm">${n}</div><div class="sub">${p} prompt${p > 1 ? "s" : ""}</div></div></div>`).join("")}</div></div>
+        <div style="margin-top:4px">${promptBlock(S2, 0, [], "", `<span class="badge">0 keystrokes · 30 to go</span><span class="badge">Claiming Andrei</span>`)}</div>
+        <span class="btn lg disabled">Verify me</span>
+      </div></div>`,
+    promptsCard("authenticate", 1) + howCard("authenticate")),
+
+  "10-auth-verified": () => shell("authenticate",
+    `<div class="task">${taskHead("authenticate", "Prove who you are", '<span class="badge">Claiming Andrei</span>')}
+      <div class="task-body stack gap24">${authVerdict(true)}</div></div>`,
+    measuredCard() + promptsCard("authenticate", 1)),
+
+  "11-auth-rejected": () => shell("authenticate",
+    `<div class="task">${taskHead("authenticate", "Prove who you are", '<span class="badge">Claiming Maria</span>')}
+      <div class="task-body stack gap24">${authVerdict(false)}</div></div>`,
+    measuredCard() + promptsCard("authenticate", 1)),
+
+  "12-map": () => topbar("") + mapPage(),
+};
+
+function authVerdict(ok) {
+  const name = ok ? "Andrei" : "Maria", sim = ok ? .684 : .291, thr = .37;
+  return `<div class="verdict" style="background:${ok ? "var(--mint)" : "var(--coral)"}"><span class="mode-mark" style="width:54px;height:54px">${I(ok ? "check" : "declined", 28, 2.4)}</span>
+      <div class="grow"><div class="big">${ok ? `Verified as ${name}` : "Not verified"}</div>
+      <p style="margin-top:4px">${ok ? `This rhythm matches ${name}'s stored profile closely enough to accept.` : `This rhythm isn't close enough to ${name}'s stored profile to accept the claim.`}</p></div>
+      <span class="stamp">${ok ? "Accepted" : "Rejected"}</span></div>
+    <div><div class="row" style="justify-content:space-between;margin-bottom:8px"><span style="font-weight:700">Similarity <span class="num">${sim.toFixed(3)}</span></span><span class="small muted">threshold ${thr.toFixed(2)} · EER 4.6%</span></div>
+      <div class="gauge"><div class="fill" style="width:${sim * 100}%;background:${ok ? "var(--mint)" : "var(--coral)"}"></div><span class="thr" style="left:${thr * 100}%"></span></div>
+      <p class="small muted" style="margin-top:12px">${name} enrolled from 5 prompts, verified with 1. At this setting, 4.6% of decisions are wrong either way.</p></div>
+    <div class="row gap12"><span class="btn lg lilac" style="flex:1">Try another sentence</span><span class="btn lg neutral" style="flex:1">Claim someone else</span></div>`;
+}
+
+function mapPage() {
+  let seed = 7; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const dots = Array.from({ length: 420 }, () => { const a = r() * 6.283, d = Math.sqrt(r()) * 230; return [380 + Math.cos(a) * d * 1.35, 270 + Math.sin(a) * d]; });
+  const people = [["Andrei", "#5dcaa5", 520, 210], ["Maria", "#ff6b6b", 300, 330], ["Jonas", "#b4b9ff", 610, 380], ["Lea", "#ffd23f", 210, 170], ["Tom", "#3987e5", 440, 120], ["Sofia", "#d55181", 690, 250]];
+  const svg = `<svg viewBox="0 0 760 540" width="100%" height="540" style="display:block">
+    ${dots.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3" fill="#b9b5cc"/>`).join("")}
+    <g stroke="#161328" stroke-width="1.5" stroke-dasharray="4 3">${[[548, 248], [470, 175], [585, 160]].map(([x, y]) => `<line x1="520" y1="210" x2="${x}" y2="${y}"/>`).join("")}</g>
+    ${people.map(([n, c, x, y]) => `<circle cx="${x}" cy="${y}" r="${n === "Andrei" ? 11 : 8}" fill="${c}" stroke="#161328" stroke-width="2.5"/>`).join("")}
+    <g transform="translate(536 186)"><rect width="78" height="28" rx="5" fill="#fff" stroke="#161328" stroke-width="2"/><text x="10" y="19" font-family="DM Sans" font-weight="700" font-size="13">Andrei</text></g>
+  </svg>`;
+  return `<div class="mapwrap stack gap20">
+    <div class="row gap16" style="align-items:flex-end"><div class="grow"><h1 style="font-size:32px">Embedding map</h1>
+      <p class="muted" style="margin-top:4px;max-width:70ch">Each dot is one person's stored 128-number profile, flattened to two dimensions. Grey dots are held-out Aalto people; coloured dots are people enrolled here.</p></div>
+      <span class="btn neutral">${I("refresh")}Refresh</span></div>
+    <div class="row gap8" style="flex-wrap:wrap"><span class="label" style="margin-right:4px">People</span>${people.map(([n, c], i) =>
+      `<span class="chip ${i === 0 ? "on" : ""}"><span class="sw" style="background:${c}"></span>${n}</span>`).join("")}
+      <span class="chip" style="color:var(--ink-2)"><span class="sw" style="background:#b9b5cc"></span>Aalto background · 500</span></div>
+    <div class="mapgrid"><div class="box" style="position:relative;overflow:hidden;background:#fbfbfd">${svg}
+        <span class="badge" style="position:absolute;left:14px;bottom:14px">Scroll to zoom · drag to pan · click a dot to pin it</span></div>
+      <aside class="box stack gap16" style="padding:18px">
+        <div class="row gap12"><span class="avatar" style="background:var(--mint)">A</span><div><h2 style="font-size:20px">Andrei</h2><p class="small muted">enrolled from 5 prompts · pinned</p></div></div>
+        <div><div class="label" style="margin-bottom:8px">Nearest in 128-D</div>
+          <div class="stack gap8">${[["aalto_10482", .741], ["Maria", .733], ["aalto_88213", .702], ["aalto_51120", .688]].map(([n, s]) =>
+            `<div class="row" style="justify-content:space-between"><span>${n}</span><span class="badge num">${s.toFixed(3)}</span></div>`).join("")}</div></div>
+        <div><div class="label" style="margin-bottom:8px">Profile vector (first 64 of 128)</div>
+          <div class="vec">${Array.from({ length: 64 }, () => { const v = r() * 2 - 1; return `<span style="background:${v > 0 ? `rgba(93,202,165,${Math.abs(v)})` : `rgba(255,107,107,${Math.abs(v)})`}"></span>`; }).join("")}</div></div>
+      </aside></div>
+    <p class="small muted" style="max-width:90ch">The axes have no units, and distances on the map are approximate. Trust the "Nearest in 128-D" list, which is exact.</p></div>`;
+}
+
+const params = new URLSearchParams(location.search);
+const id = params.get("screen") || "07-identify-match";
+if (params.get("mobile")) document.body.classList.add("m");
+document.getElementById("app").innerHTML = screens[id]();
+window.SCREENS = Object.keys(screens);
+</script>
+</body>
+</html>
