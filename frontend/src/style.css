@@ -5,7 +5,8 @@
    mint (the mark's inner ring) is the main colour. Each mode owns one fill so you can tell where you
    are at a glance: enroll mint, identify sun, authenticate lilac. Coral is reserved for wrong
    characters, rejections and destructive actions. `static` emits every variable, because JSX reads
-   some of them through inline styles that Tailwind can't see. */
+   some of them through inline styles that Tailwind can't see.
+   backend/app/static/map.html keeps a copy of these values (it's served by the backend, not Vite): change both. */
 @theme static {
   --color-ink: #161328;
   --color-ink-2: #4b4763; /* secondary text, 8.9:1 on white */
@@ -19,7 +20,8 @@
   --color-coral-soft: #ffe1e1;
   --color-wash: #f1f0f6; /* empty tracks and bars */
   --color-soft: #fbfbfd; /* the prompt box: a step off the white card */
-  --color-faint: #9a96ae; /* untyped characters: meant to recede */
+  --color-muted: #6d6985; /* placeholders: 5.3:1 on white */
+  --color-below: #c9c6d8; /* candidate bars under the threshold */
   --color-off: #e4e2ec; /* disabled fills */
 
   --shadow-brutal-sm: 2px 2px 0 0 var(--color-ink);
@@ -53,10 +55,16 @@ body {
   color: var(--color-ink);
 }
 
-/* One focus treatment everywhere: an ink ring set off from the element by a page-coloured gap. */
-:focus-visible {
+/* One focus treatment everywhere: an ink ring set off from the element by a page-coloured gap. Not on
+   tabindex="-1" targets (the verdict heading): they take focus only so it's read out and scrolled to,
+   and are never a Tab stop. */
+:focus-visible:not([tabindex="-1"]) {
   outline: 2px solid var(--color-ink);
   outline-offset: 3px;
+}
+
+[tabindex="-1"]:focus {
+  outline: none;
 }
 
 input,

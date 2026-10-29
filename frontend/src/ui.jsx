@@ -25,11 +25,12 @@ export function Button({ fill = "mint", size = "default", className = "", ...pro
   return <button className={`${buttonBase} ${pressable} ${FILL[fill]} ${buttonSizes[size]} ${className}`} {...props} />;
 }
 
-// A quiet text action (e.g. "Change name"): no border or shadow, ink on hover.
+// A quiet text action (e.g. "Change name"): no border or shadow. Ink, not ink-2: it sits on mode fills, where
+// ink-2 drops under 4.5:1. min-h-11 gives a 44px hit area without drawing a bigger box.
 export function GhostButton({ className = "", ...props }) {
   return (
     <button
-      className={`inline-flex items-center gap-1.5 border-0 bg-transparent p-0 font-sans text-[13.5px] font-bold text-ink-2 cursor-pointer hover:text-ink hover:underline underline-offset-4 decoration-2 ${className}`}
+      className={`inline-flex min-h-11 items-center gap-1.5 border-0 bg-transparent p-0 font-sans text-[13.5px] font-bold text-ink cursor-pointer hover:underline underline-offset-4 decoration-2 ${className}`}
       {...props}
     />
   );

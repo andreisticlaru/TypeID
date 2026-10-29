@@ -117,7 +117,7 @@ const icons = {
 function ScanRings({ size = 18 }) {
   const spin = { transformBox: "fill-box", transformOrigin: "center" };
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" className="shrink-0">
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" className="shrink-0 motion-reduce:hidden">
       <circle cx="24" cy="24" r="19" fill="none" stroke="currentColor" strokeWidth="5" strokeDasharray="15 4.9"
         style={{ ...spin, animation: "scan-cw 2.4s linear infinite" }} />
       <circle cx="24" cy="24" r="10.5" fill="none" stroke="currentColor" strokeWidth="4" strokeDasharray="9 4.2"
@@ -136,13 +136,28 @@ function Tile({ children, size = "size-10", fill = "white", className = "" }) {
 }
 
 // The headline of every result: a filled card with an icon, a title, a line of detail and a stamp.
-function Verdict({ fill, icon, eyebrow, title, detail, aside, stamp }) {
+// With `focusOnMount`, the verdict takes focus when it appears: on a phone the submit button sat far below it,
+// so it was off-screen, and focusing the heading is also what makes a screen reader read it out.
+function Verdict({ fill, icon, title, detail, aside, stamp, focusOnMount = false, onKeyDown }) {
+  const cardRef = useRef(null);
+  const headingRef = useRef(null);
+  useEffect(() => {
+    if (!focusOnMount) return;
+    cardRef.current.scrollIntoView({ block: "start" });
+    headingRef.current.focus({ preventScroll: true });
+  }, [focusOnMount]);
   return (
-    <div className={`flex flex-wrap items-center gap-4 rounded-base border-2 border-ink p-4 sm:p-5 shadow-brutal animate-[rise_320ms_cubic-bezier(0.16,1,0.3,1)] ${fill}`}>
+    <div ref={cardRef} className={`flex flex-wrap items-center gap-4 rounded-base border-2 border-ink p-4 sm:p-5 shadow-brutal scroll-mt-4 animate-[rise_320ms_cubic-bezier(0.16,1,0.3,1)] ${fill}`}>
       <Tile size="size-14" className="text-2xl font-display font-bold">{icon}</Tile>
       <div className="min-w-0 flex-1">
-        {eyebrow && <Label className="text-ink">{eyebrow}</Label>}
-        <h2 className="m-0 font-display text-[26px] sm:text-[30px] font-bold leading-tight tracking-tight break-words">{title}</h2>
+        <h2
+          ref={headingRef}
+          tabIndex={focusOnMount ? -1 : undefined}
+          onKeyDown={onKeyDown}
+          className="m-0 font-display text-[26px] sm:text-[30px] font-bold leading-tight tracking-tight break-words"
+        >
+          {title}
+        </h2>
         {detail && <p className="m-0 mt-1 text-[15px] leading-snug">{detail}</p>}
       </div>
       {(aside || stamp) && (
@@ -200,22 +215,27 @@ function PromptProgress({ done, total }) {
 }
 
 // Destructive steps ask first, in-world, rather than through a browser confirm(). Escape and the
-// backdrop pick the safe option.
+// backdrop pick the safe option. A native modal <dialog> keeps Tab inside and makes the page behind inert.
 function Dialog({ title, children, actions, onDismiss }) {
+  const ref = useRef(null);
   useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && onDismiss();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onDismiss]);
+    const opener = document.activeElement;
+    ref.current.showModal();
+    return () => opener?.focus();
+  }, []);
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/55 p-4" onClick={onDismiss}>
-      <div
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="dialog-title"
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[460px] rounded-base border-2 border-ink bg-white shadow-brutal-xl animate-[rise_220ms_cubic-bezier(0.16,1,0.3,1)]"
-      >
+    <dialog
+      ref={ref}
+      role="alertdialog"
+      aria-labelledby="dialog-title"
+      onCancel={(e) => {
+        e.preventDefault(); // Escape: let React unmount it, so the opener gets focus back
+        onDismiss();
+      }}
+      onClick={(e) => e.target === e.currentTarget && onDismiss()} // only the backdrop targets the <dialog> itself
+      className="m-auto w-[calc(100%-2rem)] max-w-[460px] p-0 rounded-base border-2 border-ink bg-white text-ink shadow-brutal-xl backdrop:bg-ink/55 animate-[rise_220ms_cubic-bezier(0.16,1,0.3,1)]"
+    >
+      <div>
         <div className="flex items-center gap-2.5 rounded-t-[3px] border-b-2 border-ink bg-coral px-4.5 py-3.5">
           <Icon path={icons.alert} size={18} />
           <h2 id="dialog-title" className="m-0 font-display text-lg font-bold">{title}</h2>
@@ -225,7 +245,7 @@ function Dialog({ title, children, actions, onDismiss }) {
           <div className="mt-5 flex flex-wrap justify-end gap-3">{actions}</div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -368,7 +388,7 @@ export default function App() {
       if (next === "identify") newSentence(false, next);
       if (next === "authenticate") {
         fetch(`${API}/people`)
-          .then((r) => r.json())
+          .then((r) => (r.ok ? r.json() : Promise.reject()))
           .then(setPeople)
           .catch(() => setError("Couldn't load the enrolled people."));
       }
@@ -413,7 +433,10 @@ export default function App() {
 
   function onKeyEvent(e) {
     if (e.repeat) return;
-    eventsRef.current.push({ code: e.code, key: e.key, type: e.type, t: performance.now() });
+    // The event's own timestamp: when the browser created it, on the performance.now() clock. Reading the
+    // clock here instead would add however long the main thread was busy (measured p90 9 ms, 40 ms on a
+    // throttled CPU), straight into the hold and flight times the model reads.
+    eventsRef.current.push({ code: e.code, key: e.key, type: e.type, t: e.nativeEvent.timeStamp });
 
     if (e.type === "keydown") {
       keystrokeCountRef.current += 1;
@@ -511,7 +534,7 @@ export default function App() {
   // Measured error per prompt count, from the backend's calibration table rather than a copy here.
   useEffect(() => {
     fetch(`${API}/identify/rates`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setIdentifyRates)
       .catch(() => {}); // the hint is optional; identify works without it
   }, []);
@@ -537,8 +560,8 @@ export default function App() {
 
   const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-  // Typing at a finished verdict means "go again": the next-round button holds focus and turns
-  // Enter or any printable key into a fresh round, swallowing the key that was aimed at the old prompt.
+  // Typing at a finished verdict means "go again": with focus on the verdict (or the next-round button),
+  // Enter or any printable key starts a fresh round, swallowing the key that was aimed at the old prompt.
   function nextRoundKeys(e) {
     if (e.key === "Enter") {
       e.preventDefault(); // keep the newline out of the next typing box
@@ -598,7 +621,7 @@ export default function App() {
                 key={m}
                 onClick={() => switchMode(m)}
                 aria-pressed={mode === m}
-                className={`flex-1 md:flex-none inline-flex h-9 items-center justify-center gap-2 rounded-base border-2 px-3 sm:px-4 font-sans text-[14.5px] font-bold cursor-pointer transition-colors ${
+                className={`flex-1 md:flex-none inline-flex h-11 md:h-9 items-center justify-center gap-2 rounded-base border-2 px-3 sm:px-4 font-sans text-[14.5px] font-bold cursor-pointer transition-colors ${
                   mode === m
                     ? `${FILL[fill]} border-ink text-ink shadow-brutal-sm`
                     : "border-transparent bg-transparent text-ink-2 hover:text-ink hover:border-ink"
@@ -656,7 +679,7 @@ export default function App() {
                       lockName();
                     }}
                     placeholder="e.g. Andrei"
-                    className="h-13 w-full rounded-base border-2 border-ink bg-white px-3.5 font-sans text-[18px] text-ink placeholder:text-faint"
+                    className="h-13 w-full rounded-base border-2 border-ink bg-white px-3.5 font-sans text-[18px] text-ink placeholder:text-muted"
                   />
                 </div>
                 <Button size="lg" onClick={lockName} disabled={!name.trim()}>
@@ -745,10 +768,10 @@ export default function App() {
                           key={i}
                           className={
                             match.chars[i] === "correct"
-                              ? "text-ink"
+                              ? "text-ink bg-mint/40"
                               : match.chars[i] === "wrong"
                                 ? "rounded-[2px] bg-coral text-ink shadow-[inset_0_-2px_0_var(--color-ink)]"
-                                : `text-faint${i === typed.length ? " shadow-[inset_0_-4px_0_var(--color-mint-deep)]" : ""}`
+                                : `text-ink-2${i === typed.length ? " shadow-[inset_0_-4px_0_var(--color-mint-deep)]" : ""}`
                           }
                         >
                           {ch}
@@ -779,7 +802,7 @@ export default function App() {
                   onKeyUp={onKeyUp}
                   onInput={(e) => setTyped(e.target.value)}
                   onPaste={(e) => e.preventDefault()}
-                  className="mt-4 block w-full resize-none rounded-base border-2 border-ink bg-white px-3.5 py-3 font-sans text-[18px] leading-relaxed text-ink placeholder:text-faint focus:outline-none focus-visible:outline-none focus:shadow-[0_0_0_3px_#fff,0_0_0_5px_var(--color-ink)]"
+                  className="mt-4 block w-full resize-none rounded-base border-2 border-ink bg-white px-3.5 py-3 font-sans text-[18px] leading-relaxed text-ink placeholder:text-muted focus:outline-none focus-visible:outline-none focus:shadow-[0_0_0_3px_#fff,0_0_0_5px_var(--color-ink)]"
                   rows="3"
                   placeholder="Start typing… pasting is off, the rhythm is the point"
                   autoComplete="off"
@@ -876,8 +899,10 @@ export default function App() {
                   <Verdict
                     fill="bg-sun"
                     icon={matches.results[0].name.charAt(0).toUpperCase()}
-                    eyebrow="Best match"
                     title={matches.results[0].name}
+                    detail={`Best match, above the ${matches.min_confidence.toFixed(2)} threshold.`}
+                    focusOnMount
+                    onKeyDown={nextRoundKeys}
                     aside={
                       <span className="font-display text-[30px] font-bold leading-none tabular-nums">
                         {matches.results[0].similarity.toFixed(3)}
@@ -890,6 +915,8 @@ export default function App() {
                     fill="bg-sun-soft"
                     icon={<Icon path={icons.declined} size={26} />}
                     title="No confident match"
+                    focusOnMount
+                    onKeyDown={nextRoundKeys}
                     detail={`Nobody reached the ${matches.min_confidence.toFixed(
                       2
                     )} threshold, so TypeID declined to name anyone. That's the right outcome for someone who isn't enrolled.`}
@@ -908,22 +935,23 @@ export default function App() {
                     </div>
                     <ol className="m-0 p-0 list-none flex flex-col gap-2.5">
                       {matches.results.map((r, i) => (
-                        // Ranks past the shortlist are context (how crowded it is just below), so they recede.
+                        // Ranks past the shortlist are context (how crowded it is just below), so they recede: dashed
+                        // border, ink-2 text and a faded bar. Fading the whole row would drop its text under 4.5:1.
                         <li
                           key={r.person_id}
                           className={`grid grid-cols-[34px_minmax(0,1fr)_64px] sm:grid-cols-[34px_minmax(0,150px)_1fr_74px] items-center gap-x-3.5 gap-y-2 rounded-base border-2 border-ink px-3 py-2.5 ${
                             i === 0 && matches.matched ? "bg-sun-soft shadow-brutal" : "bg-white"
-                          } ${i >= SHORTLIST ? "opacity-45 border-dashed" : ""}`}
+                          } ${i >= SHORTLIST ? "border-dashed text-ink-2" : ""}`}
                         >
                           <Tile size="size-[34px]" fill={i === 0 && matches.matched ? "sun" : "white"} className="font-display font-bold text-[15px]">
                             {i + 1}
                           </Tile>
                           <span className="truncate font-bold">{r.name}</span>
-                          <div className="col-span-3 row-start-2 sm:col-span-1 sm:col-start-3 sm:row-start-1">
+                          <div className={`col-span-3 row-start-2 sm:col-span-1 sm:col-start-3 sm:row-start-1 ${i >= SHORTLIST ? "opacity-45" : ""}`}>
                             <ThresholdBar
                               value={r.similarity}
                               threshold={matches.min_confidence}
-                              fill={r.similarity >= matches.min_confidence ? (i === 0 ? "bg-sun" : "bg-mint") : "bg-[#c9c6d8]"}
+                              fill={r.similarity >= matches.min_confidence ? (i === 0 ? "bg-sun" : "bg-mint") : "bg-below"}
                             />
                           </div>
                           <span className="col-start-3 row-start-1 sm:col-start-4 text-right font-display text-[15px] font-bold tabular-nums">
@@ -939,7 +967,7 @@ export default function App() {
                 )}
 
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button size="lg" fill="sun" onClick={nextRound} onKeyDown={nextRoundKeys} autoFocus className="sm:flex-1">
+                  <Button size="lg" fill="sun" onClick={nextRound} onKeyDown={nextRoundKeys} className="sm:flex-1">
                     Try another sentence
                     <Icon path={icons.arrow} />
                   </Button>
@@ -958,6 +986,8 @@ export default function App() {
                   fill={auth.accepted ? "bg-mint" : "bg-coral"}
                   icon={<Icon path={auth.accepted ? icons.check : icons.declined} size={28} />}
                   title={auth.accepted ? `Verified as ${auth.name}` : "Not verified"}
+                  focusOnMount
+                  onKeyDown={nextRoundKeys}
                   detail={
                     auth.accepted
                       ? `This rhythm matches ${auth.name}'s stored profile closely enough to accept.`
@@ -990,7 +1020,7 @@ export default function App() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button size="lg" fill="lilac" onClick={nextRound} onKeyDown={nextRoundKeys} autoFocus className="sm:flex-1">
+                  <Button size="lg" fill="lilac" onClick={nextRound} onKeyDown={nextRoundKeys} className="sm:flex-1">
                     Try another sentence
                   </Button>
                   <Button size="lg" fill="white" onClick={() => claim("")} className="sm:flex-1">
@@ -1038,7 +1068,7 @@ export default function App() {
               </div>
               <p className="m-0 mt-1.5 text-[13px] text-ink-2">Dwell time per keystroke, last prompt</p>
               <div className="mt-3 flex gap-4">
-                <GhostButton onClick={() => setShowRaw((prev) => !prev)} className="text-ink underline">
+                <GhostButton onClick={() => setShowRaw((prev) => !prev)} className="underline">
                   {showRaw ? "Hide raw event log" : "Show raw event log"}
                 </GhostButton>
                 {showRaw && (
@@ -1048,7 +1078,7 @@ export default function App() {
                       setCopyLabel("Copied");
                       setTimeout(() => setCopyLabel("Copy JSON"), 1200);
                     }}
-                    className="text-ink underline"
+                    className="underline"
                   >
                     {copyLabel}
                   </GhostButton>
