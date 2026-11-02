@@ -3,8 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#221e3a">
+<meta name="theme-color" content="#ffffff">
+<script>
+// Runs before first paint so the page never flashes the wrong theme. The switch's choice wins; until there is
+// one, follow the system. backend/app/static/map.html keeps a copy: change both.
+(() => {
+  const system = matchMedia("(prefers-color-scheme: dark)");
+  const apply = () => {
+    const theme = localStorage.getItem("theme") || (system.matches ? "dark" : "light");
+    document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#221e3a" : "#ffffff";
+  };
+  window.toggleTheme = () => {
+    localStorage.setItem("theme", document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+    apply();
+  };
+  system.addEventListener("change", apply);
+  addEventListener("storage", apply); // the map opens in its own tab
+  apply();
+})();
+</script>
 <meta name="description" content="TypeID recognizes you by how you type, not what you type — open-set biometric identification from keystroke rhythm.">
 <link rel="icon" type="image/svg+xml" href="/mark.svg">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">

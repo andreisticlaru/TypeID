@@ -4,6 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TypeID Embedding Map</title>
+<script>
+// Runs before first paint so the page never flashes the wrong theme. The switch's choice wins; until there is
+// one, follow the system. Copied from frontend/index.html: change both.
+(() => {
+  const system = matchMedia("(prefers-color-scheme: dark)");
+  const apply = () => {
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || (system.matches ? "dark" : "light");
+  };
+  window.toggleTheme = () => {
+    localStorage.setItem("theme", document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+    apply();
+  };
+  system.addEventListener("change", apply);
+  addEventListener("storage", apply); // the capture UI is in another tab
+  apply();
+})();
+</script>
 <!-- Relative, so it resolves both via the frontend's /api proxy and on the backend directly. -->
 <link rel="icon" type="image/svg+xml" href="map/mark.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,14 +42,12 @@
     --sun-soft: #fff8d6; --grid: rgba(22,19,40,.06);
     --shadow: 4px 4px 0 0 var(--border);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      color-scheme: dark;
-      --page: #161328; --surface: #221e3a; --wash: #2f2a4c; --soft: #1b1830;
-      --ink: #f3f1fb; --ink2: #bdb9d4; --muted: #a5a1c0;
-      --border: #d9d6ec; --dot: rgba(217,214,236,0.3);
-      --sun-soft: #40371a; --grid: rgba(217,214,236,.05);
-    }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #161328; --surface: #221e3a; --wash: #2f2a4c; --soft: #1b1830;
+    --ink: #f3f1fb; --ink2: #bdb9d4; --muted: #a5a1c0;
+    --border: #d9d6ec; --dot: rgba(217,214,236,0.3);
+    --sun-soft: #40371a; --grid: rgba(217,214,236,.05);
   }
 
   * { box-sizing: border-box; }
@@ -48,6 +63,15 @@
   .topbar .in { max-width: 1440px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
   .topbar img { width: 52px; height: 52px; }
   .topbar b { font: 700 22px/1 "Space Grotesk", sans-serif; }
+  /* Same switch as the capture UI's ThemeSwitch. */
+  .switch { margin-left: auto; display: grid; place-items: center; width: 56px; height: 44px; padding: 0; border: 0; border-radius: 5px; background: none; color: var(--ink); cursor: pointer; }
+  .switch:focus-visible { outline: 2px solid var(--border); outline-offset: 3px; }
+  .switch .track { position: relative; display: block; width: 56px; height: 32px; border: 2px solid var(--border); border-radius: 5px; background: var(--surface); box-shadow: 2px 2px 0 var(--border); transition: background-color .1s; }
+  .switch .knob { position: absolute; left: 2px; top: 2px; display: grid; place-items: center; width: 24px; height: 24px; border: 2px solid var(--border); border-radius: 3px; background: var(--surface); transition: transform .1s; }
+  .switch svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .switch[aria-checked="true"] .track { background: var(--c1); }
+  .switch[aria-checked="true"] .knob { transform: translateX(24px); }
+  .switch[aria-checked="true"] .sun, .switch[aria-checked="false"] .moon { display: none; }
   .wrap { max-width: 1440px; margin: 0 auto; padding: 24px 16px 56px; }
 
   header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -117,11 +141,16 @@
     .inspector { position: static; }
     .mapcard { height: 62vh; }
   }
-  @media (prefers-reduced-motion: reduce) { .overlay, .btn, .chip { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .overlay, .btn, .chip, .switch .track, .switch .knob { transition: none; } }
 </style>
 </head>
 <body>
-<div class="topbar"><div class="in"><img src="map/mark.svg" alt=""><b>TypeID</b></div></div>
+<div class="topbar"><div class="in"><img src="map/mark.svg" alt=""><b>TypeID</b>
+  <button class="switch" id="theme" type="button" role="switch" aria-label="Dark mode" aria-checked="false"><span class="track"><span class="knob">
+    <svg class="sun" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 1.5V3M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1"/></svg>
+    <svg class="moon" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.5A6 6 0 0 1 6.5 2.5a6 6 0 1 0 7 7z"/></svg>
+  </span></span></button>
+</div></div>
 <div class="wrap">
   <header>
     <div>
@@ -361,7 +390,12 @@
   document.getElementById("refresh").onclick = load;
   document.getElementById("tableview").addEventListener("toggle", (e) => { if (e.target.open) renderTable(); });
   new ResizeObserver(() => { fit(); draw(); }).observe(canvas);
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderLegend(); draw(); renderInspector(); });
+  const themeSwitch = document.getElementById("theme");
+  const showTheme = () => themeSwitch.setAttribute("aria-checked", document.documentElement.dataset.theme === "dark");
+  themeSwitch.onclick = window.toggleTheme;
+  showTheme();
+  new MutationObserver(() => { showTheme(); renderLegend(); draw(); renderInspector(); })
+    .observe(document.documentElement, { attributeFilter: ["data-theme"] });
 
   // ---------- data ----------
   async function load() {

@@ -43,46 +43,49 @@
 }
 
 html {
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
-/* Follows the system setting. The page takes the mark's ink and cards sit a step lighter; lines turn pale, since
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* data-theme is set by the script in index.html: the switch's choice, or the system setting until there is one.
+   The page takes the mark's ink and cards sit a step lighter; lines turn pale, since
    ink edges and shadows would vanish on a dark page. Mint, sun, lilac and coral stay the brand's own values.
    In `base` so a text-* utility on the same element still wins over the `color` set here. */
 @layer base {
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --color-ink: #f3f1fb;
-      --color-ink-2: #bdb9d4;
-      --color-line: #d9d6ec;
-      --color-surface: #221e3a;
-      --color-page: #161328;
-      --color-grid: rgb(217 214 236 / 0.05);
-      --color-scrim: #05040c;
-      --color-mint-deep: #5dcaa5; /* the prompt's cursor: the deep value disappears on a dark box */
-      --color-sun-soft: #40371a;
-      --color-coral-soft: #4a2230;
-      --color-wash: #2f2a4c;
-      --color-soft: #1b1830;
-      --color-muted: #a5a1c0;
-      --color-below: #57527a;
-      --color-off: #2f2a4c;
-    }
+  :root[data-theme="dark"] {
+    --color-ink: #f3f1fb;
+    --color-ink-2: #bdb9d4;
+    --color-line: #d9d6ec;
+    --color-surface: #221e3a;
+    --color-page: #161328;
+    --color-grid: rgb(217 214 236 / 0.05);
+    --color-scrim: #05040c;
+    --color-mint-deep: #5dcaa5; /* the prompt's cursor: the deep value disappears on a dark box */
+    --color-sun-soft: #40371a;
+    --color-coral-soft: #4a2230;
+    --color-wash: #2f2a4c;
+    --color-soft: #1b1830;
+    --color-muted: #a5a1c0;
+    --color-below: #57527a;
+    --color-off: #2f2a4c;
+  }
 
-    /* Everything inside a fill reads as on a light colour again. A disabled Button keeps its fill class but
-       paints bg-off, so it stays out. */
-    :is(.bg-mint, .bg-sun, .bg-lilac, .bg-coral):not(:disabled) {
-      --color-ink: #161328;
-      --color-ink-2: #4b4763;
-      color: var(--color-ink);
-    }
+  /* Everything inside a fill reads as on a light colour again. A disabled Button keeps its fill class but
+     paints bg-off, so it stays out. */
+  [data-theme="dark"] :is(.bg-mint, .bg-sun, .bg-lilac, .bg-coral):not(:disabled) {
+    --color-ink: #161328;
+    --color-ink-2: #4b4763;
+    color: var(--color-ink);
+  }
 
-    /* ...and a neutral surface nested in a fill (a Tile, the verdict's stamp) reads as on dark. */
-    :is(.bg-surface, .bg-soft, .bg-page, .bg-wash, .bg-sun-soft, .bg-coral-soft) {
-      --color-ink: #f3f1fb;
-      --color-ink-2: #bdb9d4;
-      color: var(--color-ink);
-    }
+  /* ...and a neutral surface nested in a fill (a Tile, the verdict's stamp) reads as on dark. */
+  [data-theme="dark"] :is(.bg-surface, .bg-soft, .bg-page, .bg-wash, .bg-sun-soft, .bg-coral-soft) {
+    --color-ink: #f3f1fb;
+    --color-ink-2: #bdb9d4;
+    color: var(--color-ink);
   }
 }
 
