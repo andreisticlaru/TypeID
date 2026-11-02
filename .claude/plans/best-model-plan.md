@@ -80,6 +80,27 @@ KVC-style EER, 5 enrollment sequences; k = sequences averaged per query (score l
   for cross-session; check again on Buffalo.
 - Product implication: the demo identifies from 1 prompt "for speed"; 2–3 prompts roughly halve errors.
 
+## Results: lever 4, hidden 256 (2026-10-27, `runs/p7_c_h256`, results `paired_p7_h256_final_*.json`)
+
+Recipe C unchanged, v1 LSTM hidden 128 → 256 (217k → 828k parameters), 68k train people, 600k steps, no
+collapse. Paired vs C1 (seed 0) and C1_s1 (seed 1), same people.
+
+| | C1 | C1_s1 | h256 | h256 − C1 [95% CI] |
+|---|---|---|---|---|
+| Aalto Rank-1 | 87.91 | 88.53 | 89.13 | +1.23 [+0.92, +1.55] |
+| Aalto KVC EER | 2.63 | 2.56 | 2.40 | −0.23 [−0.28, −0.19] |
+| Aalto FNMR@1% | 8.69 | 8.46 | 7.27 | −1.42 [−1.64, −1.23] |
+| KeyRecs cross KVC EER | 8.78 | 8.47 | 8.47 | −0.31 [−1.25, +0.71] |
+| KeyRecs cross FNMR@1% | 39.29 | 38.78 | 43.57 | +4.29 [+0.20, +8.88] |
+| KeyRecs within KVC EER | 4.56 | 4.44 | 4.85 | +0.29 [−0.40, +0.93] |
+
+- Aalto: a real gain, beyond seed noise (vs C1_s1 too: KVC EER −0.16 [−0.21, −0.11], Rank-1 +0.60).
+  Capacity was a bottleneck for same-session.
+- KeyRecs: tie on EER; cross-session FNMR@1% and Rank-1 slightly worse (CIs barely exclude 0, 98 people).
+  The extra capacity fits Aalto's single sitting; it doesn't carry over to other sessions, as expected.
+- Run 2 (hidden 256 on 115k people, `runs/p7_c_h256_115k`) started: tests whether the bigger model can use the
+  extra people that hidden 128 couldn't.
+
 ## Order
 
 1. Levers 1–3 first: existing models, minutes to hours, testable now on Aalto (`unseen_nf`) and KeyRecs
