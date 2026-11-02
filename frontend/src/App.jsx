@@ -129,7 +129,7 @@ function ScanRings({ size = 18 }) {
 // A square icon tile, like the library's avatar: used for mode marks and verdict icons.
 function Tile({ children, size = "size-10", fill = "white", className = "" }) {
   return (
-    <span className={`${size} grid place-items-center shrink-0 rounded-base border-2 border-ink ${FILL[fill]} ${className}`}>
+    <span className={`${size} grid place-items-center shrink-0 rounded-base border-2 border-line ${FILL[fill]} ${className}`}>
       {children}
     </span>
   );
@@ -147,7 +147,7 @@ function Verdict({ fill, icon, title, detail, aside, stamp, focusOnMount = false
     headingRef.current.focus({ preventScroll: true });
   }, [focusOnMount]);
   return (
-    <div ref={cardRef} className={`flex flex-wrap items-center gap-4 rounded-base border-2 border-ink p-4 sm:p-5 shadow-brutal scroll-mt-4 animate-[rise_320ms_cubic-bezier(0.16,1,0.3,1)] ${fill}`}>
+    <div ref={cardRef} className={`flex flex-wrap items-center gap-4 rounded-base border-2 border-line p-4 sm:p-5 shadow-brutal scroll-mt-4 animate-[rise_320ms_cubic-bezier(0.16,1,0.3,1)] ${fill}`}>
       <Tile size="size-14" className="text-2xl font-display font-bold">{icon}</Tile>
       <div className="min-w-0 flex-1">
         <h2
@@ -164,7 +164,7 @@ function Verdict({ fill, icon, title, detail, aside, stamp, focusOnMount = false
         <div className="flex sm:flex-col items-center sm:items-end gap-3 sm:gap-2">
           {aside}
           {stamp && (
-            <span className="-rotate-3 rounded-base border-2 border-ink bg-white px-2.5 py-1 text-[12.5px] font-bold uppercase tracking-[0.1em] shadow-brutal-sm">
+            <span className="-rotate-3 rounded-base border-2 border-line bg-surface px-2.5 py-1 text-[12.5px] font-bold uppercase tracking-[0.1em] shadow-brutal-sm">
               {stamp}
             </span>
           )}
@@ -177,14 +177,14 @@ function Verdict({ fill, icon, title, detail, aside, stamp, focusOnMount = false
 // A filled bar inside an ink track with the decision threshold as a dashed line through it.
 function ThresholdBar({ value, threshold, fill, height = "h-[18px]", line = "border-dashed" }) {
   return (
-    <div className={`relative ${height} rounded-[3px] border-2 border-ink bg-wash`}>
+    <div className={`relative ${height} rounded-[3px] border-2 border-line bg-wash`}>
       <div
-        className={`h-full border-r-2 border-ink origin-left animate-[sweep_620ms_cubic-bezier(0.16,1,0.3,1)] ${fill}`}
+        className={`h-full border-r-2 border-line origin-left animate-[sweep_620ms_cubic-bezier(0.16,1,0.3,1)] ${fill}`}
         style={{ width: `${Math.min(Math.max(value, 0), 1) * 100}%` }}
       />
       <span
         aria-hidden="true"
-        className={`absolute -top-1.5 -bottom-1.5 border-l-2 border-ink ${line}`}
+        className={`absolute -top-1.5 -bottom-1.5 border-l-2 border-line ${line}`}
         style={{ left: `${threshold * 100}%` }}
       />
     </div>
@@ -198,10 +198,10 @@ function PromptProgress({ done, total }) {
         {Array.from({ length: total }, (_, i) => (
           <span
             key={i}
-            className={`h-3.5 rounded-[3px] border-2 border-ink ${total > 5 ? "w-4" : "w-8"} ${i < done ? "bg-mint" : "bg-white"}`}
+            className={`h-3.5 rounded-[3px] border-2 border-line ${total > 5 ? "w-4" : "w-8"} ${i < done ? "bg-mint" : "bg-surface"}`}
             style={
               i === done
-                ? { background: "repeating-linear-gradient(-45deg, var(--color-mint) 0 4px, #fff 4px 8px)" }
+                ? { background: "repeating-linear-gradient(-45deg, var(--color-mint) 0 4px, var(--color-surface) 4px 8px)" }
                 : undefined
             }
           />
@@ -233,10 +233,10 @@ function Dialog({ title, children, actions, onDismiss }) {
         onDismiss();
       }}
       onClick={(e) => e.target === e.currentTarget && onDismiss()} // only the backdrop targets the <dialog> itself
-      className="m-auto w-[calc(100%-2rem)] max-w-[460px] p-0 rounded-base border-2 border-ink bg-white text-ink shadow-brutal-xl backdrop:bg-ink/55 animate-[rise_220ms_cubic-bezier(0.16,1,0.3,1)]"
+      className="m-auto w-[calc(100%-2rem)] max-w-[460px] p-0 rounded-base border-2 border-line bg-surface text-ink shadow-brutal-xl backdrop:bg-scrim/55 animate-[rise_220ms_cubic-bezier(0.16,1,0.3,1)]"
     >
       <div>
-        <div className="flex items-center gap-2.5 rounded-t-[3px] border-b-2 border-ink bg-coral px-4.5 py-3.5">
+        <div className="flex items-center gap-2.5 rounded-t-[3px] border-b-2 border-line bg-coral px-4.5 py-3.5">
           <Icon path={icons.alert} size={18} />
           <h2 id="dialog-title" className="m-0 font-display text-lg font-bold">{title}</h2>
         </div>
@@ -254,7 +254,7 @@ function ErrorNote({ error }) {
   return (
     <div aria-live="polite">
       {error && (
-        <p className="m-0 mt-6 flex items-start gap-2.5 rounded-base border-2 border-ink bg-coral-soft px-4 py-3 text-[14.5px] leading-snug shadow-brutal animate-[rise_320ms_cubic-bezier(0.16,1,0.3,1)]">
+        <p className="m-0 mt-6 flex items-start gap-2.5 rounded-base border-2 border-line bg-coral-soft px-4 py-3 text-[14.5px] leading-snug shadow-brutal animate-[rise_320ms_cubic-bezier(0.16,1,0.3,1)]">
           <Icon path={icons.alert} className="mt-[3px]" />
           <span>{error}</span>
         </p>
@@ -600,7 +600,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-white border-b-2 border-ink">
+      <header className="bg-surface border-b-2 border-line">
         <div className="mx-auto max-w-[1160px] px-4 py-3 sm:px-6 sm:py-3.5 flex flex-wrap items-center gap-x-6 gap-y-3">
           <div className="flex items-center gap-3 min-w-0">
             <img src="/mark.svg" alt="" width="56" height="56" className="shrink-0" />
@@ -614,7 +614,7 @@ export default function App() {
 
           <nav
             aria-label="Mode"
-            className="order-3 w-full md:order-none md:w-auto md:ml-auto flex gap-1.5 rounded-base border-2 border-ink bg-page p-1.5"
+            className="order-3 w-full md:order-none md:w-auto md:ml-auto flex gap-1.5 rounded-base border-2 border-line bg-page p-1.5"
           >
             {Object.entries(MODES).map(([m, { label, fill, icon }]) => (
               <button
@@ -623,8 +623,8 @@ export default function App() {
                 aria-pressed={mode === m}
                 className={`flex-1 md:flex-none inline-flex h-11 md:h-9 items-center justify-center gap-2 rounded-base border-2 px-3 sm:px-4 font-sans text-[14.5px] font-bold cursor-pointer transition-colors ${
                   mode === m
-                    ? `${FILL[fill]} border-ink text-ink shadow-brutal-sm`
-                    : "border-transparent bg-transparent text-ink-2 hover:text-ink hover:border-ink"
+                    ? `${FILL[fill]} border-line text-ink shadow-brutal-sm`
+                    : "border-transparent bg-transparent text-ink-2 hover:text-ink hover:border-line"
                 }`}
               >
                 <Icon path={icons[icon]} size={15} className="hidden sm:block" />
@@ -637,7 +637,7 @@ export default function App() {
             href={`${API}/map`}
             target="_blank"
             rel="noreferrer"
-            className="ml-auto md:ml-0 inline-flex h-11 items-center gap-2 rounded-base border-2 border-ink bg-white px-4 font-bold text-ink no-underline shadow-brutal transition-all duration-100 hover:translate-x-1 hover:translate-y-1 hover:shadow-none"
+            className="ml-auto md:ml-0 inline-flex h-11 items-center gap-2 rounded-base border-2 border-line bg-surface px-4 font-bold text-ink no-underline shadow-brutal transition-all duration-100 hover:translate-x-1 hover:translate-y-1 hover:shadow-none"
           >
             <Icon path={icons.map} />
             Map
@@ -647,8 +647,8 @@ export default function App() {
       </header>
 
       <div className="mx-auto w-full max-w-[1160px] flex-1 px-4 py-6 sm:px-6 sm:py-8 grid gap-6 lg:gap-7 lg:grid-cols-[minmax(0,1fr)_360px] items-start">
-        <main className="min-w-0 rounded-base border-2 border-ink bg-white shadow-brutal-lg">
-          <div className={`flex flex-wrap items-center gap-x-3.5 gap-y-2.5 rounded-t-[3px] border-b-2 border-ink px-4 py-3.5 sm:px-6 sm:py-4 ${FILL[modeFill]}`}>
+        <main className="min-w-0 rounded-base border-2 border-line bg-surface shadow-brutal-lg">
+          <div className={`flex flex-wrap items-center gap-x-3.5 gap-y-2.5 rounded-t-[3px] border-b-2 border-line px-4 py-3.5 sm:px-6 sm:py-4 ${FILL[modeFill]}`}>
             <Tile>
               <Icon path={icons[MODES[mode].icon]} size={18} />
             </Tile>
@@ -679,7 +679,7 @@ export default function App() {
                       lockName();
                     }}
                     placeholder="e.g. Andrei"
-                    className="h-13 w-full rounded-base border-2 border-ink bg-white px-3.5 font-sans text-[18px] text-ink placeholder:text-muted"
+                    className="h-13 w-full rounded-base border-2 border-line bg-surface px-3.5 font-sans text-[18px] text-ink placeholder:text-muted"
                   />
                 </div>
                 <Button size="lg" onClick={lockName} disabled={!name.trim()}>
@@ -711,8 +711,8 @@ export default function App() {
                       {people.map((p) => (
                         <label
                           key={p.person_id}
-                          className={`flex items-center gap-2.5 min-w-0 cursor-pointer rounded-base border-2 border-ink px-3 py-2.5 transition-all duration-100 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-ink ${
-                            claimId === p.person_id ? "bg-lilac shadow-brutal" : "bg-white hover:shadow-brutal-sm"
+                          className={`flex items-center gap-2.5 min-w-0 cursor-pointer rounded-base border-2 border-line px-3 py-2.5 transition-all duration-100 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-line ${
+                            claimId === p.person_id ? "bg-lilac shadow-brutal" : "bg-surface hover:shadow-brutal-sm"
                           }`}
                         >
                           <input
@@ -758,7 +758,7 @@ export default function App() {
                   </div>
                 )}
 
-                <div className="relative rounded-base border-2 border-ink bg-soft p-4 pr-16 sm:p-5 sm:pr-18">
+                <div className="relative rounded-base border-2 border-line bg-soft p-4 pr-16 sm:p-5 sm:pr-18">
                   <Label className="block mb-2">Type this</Label>
                   <p className="m-0 font-display text-[22px] sm:text-[27px] leading-[1.42] font-medium tracking-tight">
                     <span className="sr-only">{sentence}</span>
@@ -802,7 +802,7 @@ export default function App() {
                   onKeyUp={onKeyUp}
                   onInput={(e) => setTyped(e.target.value)}
                   onPaste={(e) => e.preventDefault()}
-                  className="mt-4 block w-full resize-none rounded-base border-2 border-ink bg-white px-3.5 py-3 font-sans text-[18px] leading-relaxed text-ink placeholder:text-muted focus:outline-none focus-visible:outline-none focus:shadow-[0_0_0_3px_#fff,0_0_0_5px_var(--color-ink)]"
+                  className="mt-4 block w-full resize-none rounded-base border-2 border-line bg-surface px-3.5 py-3 font-sans text-[18px] leading-relaxed text-ink placeholder:text-muted focus:outline-none focus-visible:outline-none focus:shadow-[0_0_0_3px_var(--color-surface),0_0_0_5px_var(--color-ink)]"
                   rows="3"
                   placeholder="Start typing… pasting is off, the rhythm is the point"
                   autoComplete="off"
@@ -850,7 +850,7 @@ export default function App() {
             )}
 
             {collision && (
-              <div className="grid grid-cols-[18px_1fr] gap-x-3 gap-y-1 rounded-base border-2 border-ink bg-coral-soft px-4 py-3.5 shadow-brutal animate-[rise_280ms_cubic-bezier(0.16,1,0.3,1)]">
+              <div className="grid grid-cols-[18px_1fr] gap-x-3 gap-y-1 rounded-base border-2 border-line bg-coral-soft px-4 py-3.5 shadow-brutal animate-[rise_280ms_cubic-bezier(0.16,1,0.3,1)]">
                 <Icon path={icons.alert} size={18} className="mt-0.5" />
                 <p className="m-0 font-bold">Someone is already enrolled as {name}</p>
                 <p className="m-0 col-start-2 leading-snug">
@@ -939,8 +939,8 @@ export default function App() {
                         // border, ink-2 text and a faded bar. Fading the whole row would drop its text under 4.5:1.
                         <li
                           key={r.person_id}
-                          className={`grid grid-cols-[34px_minmax(0,1fr)_64px] sm:grid-cols-[34px_minmax(0,150px)_1fr_74px] items-center gap-x-3.5 gap-y-2 rounded-base border-2 border-ink px-3 py-2.5 ${
-                            i === 0 && matches.matched ? "bg-sun-soft shadow-brutal" : "bg-white"
+                          className={`grid grid-cols-[34px_minmax(0,1fr)_64px] sm:grid-cols-[34px_minmax(0,150px)_1fr_74px] items-center gap-x-3.5 gap-y-2 rounded-base border-2 border-line px-3 py-2.5 ${
+                            i === 0 && matches.matched ? "bg-sun-soft shadow-brutal" : "bg-surface"
                           } ${i >= SHORTLIST ? "border-dashed text-ink-2" : ""}`}
                         >
                           <Tile size="size-[34px]" fill={i === 0 && matches.matched ? "sun" : "white"} className="font-display font-bold text-[15px]">
@@ -1047,21 +1047,21 @@ export default function App() {
                   [stats.flight, "avg flight"],
                   [stats.backspaces, "backspaces"],
                 ].map(([value, label]) => (
-                  <div key={label} className="rounded-base border-2 border-ink px-2.5 py-2">
+                  <div key={label} className="rounded-base border-2 border-line px-2.5 py-2">
                     <span className="block font-display text-xl font-bold leading-tight tabular-nums">{value}</span>
                     <span className="text-xs text-ink-2">{label}</span>
                   </div>
                 ))}
               </div>
               <div
-                className="mt-3.5 h-16 flex items-end gap-0.5 rounded-base border-2 border-ink bg-soft p-1"
+                className="mt-3.5 h-16 flex items-end gap-0.5 rounded-base border-2 border-line bg-soft p-1"
                 role="img"
                 aria-label="Dwell time per keystroke"
               >
                 {dwellValues.map((d, i) => (
                   <div
                     key={i}
-                    className="flex-1 min-w-[2px] rounded-t-[2px] border-[1.5px] border-b-0 border-ink bg-mint"
+                    className="flex-1 min-w-[2px] rounded-t-[2px] border-[1.5px] border-b-0 border-line bg-mint"
                     style={{ height: `${Math.max((d / maxDwell) * 100, 6)}%` }}
                   />
                 ))}
@@ -1085,7 +1085,7 @@ export default function App() {
                 )}
               </div>
               {showRaw && (
-                <pre className="m-0 mt-3 max-h-[220px] overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-base border-2 border-ink bg-soft p-3 font-mono text-xs leading-relaxed">
+                <pre className="m-0 mt-3 max-h-[220px] overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-base border-2 border-line bg-soft p-3 font-mono text-xs leading-relaxed">
                   {rawText}
                 </pre>
               )}
@@ -1100,8 +1100,8 @@ export default function App() {
                   {PROMPT_COUNTS.map((n) => (
                     <label
                       key={n}
-                      className={`grid place-items-center min-w-13 h-11 px-3.5 cursor-pointer rounded-base border-2 border-ink text-base font-bold tabular-nums transition-all duration-100 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-ink ${
-                        promptCount === n ? `${FILL[modeFill]} shadow-brutal` : "bg-white hover:shadow-brutal-sm"
+                      className={`grid place-items-center min-w-13 h-11 px-3.5 cursor-pointer rounded-base border-2 border-line text-base font-bold tabular-nums transition-all duration-100 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-line ${
+                        promptCount === n ? `${FILL[modeFill]} shadow-brutal` : "bg-surface hover:shadow-brutal-sm"
                       }`}
                     >
                       <input
@@ -1125,7 +1125,7 @@ export default function App() {
                     {PROMPT_COUNTS.map((n) => (
                       <div
                         key={n}
-                        className={`rounded-base border-2 border-ink px-2.5 py-2 ${n === promptCount ? "bg-sun shadow-brutal-sm" : "bg-white"}`}
+                        className={`rounded-base border-2 border-line px-2.5 py-2 ${n === promptCount ? "bg-sun shadow-brutal-sm" : "bg-surface"}`}
                       >
                         <span className="block font-display text-xl font-bold tabular-nums">
                           {Math.round(identifyRates.found_percent[n])}%
