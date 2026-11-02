@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <rect x="3" y="3" width="94" height="94" rx="14" fill="#161328" stroke="#161328" stroke-width="6"/>
+  <path d="M66.31 14.86 A37.5 37.5 0 0 1 83.54 38.56 L72.82 41.04 A26.5 26.5 0 0 0 60.65 24.29Z" fill="#1d9e75"/>
+  <path d="M83.54 55.44 A37.5 37.5 0 0 1 66.31 79.14 L60.65 69.71 A26.5 26.5 0 0 0 72.82 52.96Z" fill="#1d9e75"/>
+  <path d="M50.27 84.36 A37.5 37.5 0 0 1 22.40 75.30 L29.61 67.00 A26.5 26.5 0 0 0 49.31 73.40Z" fill="#1d9e75"/>
+  <path d="M12.48 61.65 A37.5 37.5 0 0 1 12.48 32.35 L22.61 36.65 A26.5 26.5 0 0 0 22.61 57.35Z" fill="#1d9e75"/>
+  <path d="M22.40 18.70 A37.5 37.5 0 0 1 50.27 9.64 L49.31 20.60 A26.5 26.5 0 0 0 29.61 27.00Z" fill="#1d9e75"/>
+  <g transform="translate(37.2 30.799999999999997) scale(1.6)" stroke-linejoin="miter" stroke-miterlimit="10">
+    <path d="M2 2v20l5-4.8 3.6 7.6 3.8-1.8-3.6-7.4H18z" fill="#161328" transform="translate(1.4 1.4)"/>
+    <path d="M2 2v20l5-4.8 3.6 7.6 3.8-1.8-3.6-7.4H18z" fill="#ffffff" stroke="#161328" stroke-width="2.03"/>
+  </g>
+</svg>
