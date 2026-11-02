@@ -6,11 +6,18 @@
    are at a glance: enroll mint, identify sun, authenticate lilac. Coral is reserved for wrong
    characters, rejections and destructive actions. `static` emits every variable, because JSX reads
    some of them through inline styles that Tailwind can't see.
-   backend/app/static/map.html keeps a copy of these values (it's served by the backend, not Vite): change both. */
+   backend/app/static/map.html keeps a copy of these values (it's served by the backend, not Vite): change both.
+
+   Three roles that are all ink in light mode and split in dark: `ink` is text on neutral surfaces, `line` is
+   borders and shadows, and text on a fill stays dark because the fills themselves don't change. */
 @theme static {
   --color-ink: #161328;
   --color-ink-2: #4b4763; /* secondary text, 8.9:1 on white */
+  --color-line: #161328;
+  --color-surface: #ffffff; /* cards, inputs and the "white" fill */
   --color-page: #e7f6ef;
+  --color-grid: rgb(22 19 40 / 0.06);
+  --color-scrim: #161328;
   --color-mint: #5dcaa5;
   --color-mint-deep: #1d9e75;
   --color-sun: #ffd23f;
@@ -24,10 +31,10 @@
   --color-below: #c9c6d8; /* candidate bars under the threshold */
   --color-off: #e4e2ec; /* disabled fills */
 
-  --shadow-brutal-sm: 2px 2px 0 0 var(--color-ink);
-  --shadow-brutal: 4px 4px 0 0 var(--color-ink);
-  --shadow-brutal-lg: 6px 6px 0 0 var(--color-ink);
-  --shadow-brutal-xl: 8px 8px 0 0 var(--color-ink);
+  --shadow-brutal-sm: 2px 2px 0 0 var(--color-line);
+  --shadow-brutal: 4px 4px 0 0 var(--color-line);
+  --shadow-brutal-lg: 6px 6px 0 0 var(--color-line);
+  --shadow-brutal-xl: 8px 8px 0 0 var(--color-line);
 
   --radius-base: 5px;
 
@@ -36,7 +43,47 @@
 }
 
 html {
-  color-scheme: light;
+  color-scheme: light dark;
+}
+
+/* Follows the system setting. The page takes the mark's ink and cards sit a step lighter; lines turn pale, since
+   ink edges and shadows would vanish on a dark page. Mint, sun, lilac and coral stay the brand's own values.
+   In `base` so a text-* utility on the same element still wins over the `color` set here. */
+@layer base {
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-ink: #f3f1fb;
+      --color-ink-2: #bdb9d4;
+      --color-line: #d9d6ec;
+      --color-surface: #221e3a;
+      --color-page: #161328;
+      --color-grid: rgb(217 214 236 / 0.05);
+      --color-scrim: #05040c;
+      --color-mint-deep: #5dcaa5; /* the prompt's cursor: the deep value disappears on a dark box */
+      --color-sun-soft: #40371a;
+      --color-coral-soft: #4a2230;
+      --color-wash: #2f2a4c;
+      --color-soft: #1b1830;
+      --color-muted: #a5a1c0;
+      --color-below: #57527a;
+      --color-off: #2f2a4c;
+    }
+
+    /* Everything inside a fill reads as on a light colour again. A disabled Button keeps its fill class but
+       paints bg-off, so it stays out. */
+    :is(.bg-mint, .bg-sun, .bg-lilac, .bg-coral):not(:disabled) {
+      --color-ink: #161328;
+      --color-ink-2: #4b4763;
+      color: var(--color-ink);
+    }
+
+    /* ...and a neutral surface nested in a fill (a Tile, the verdict's stamp) reads as on dark. */
+    :is(.bg-surface, .bg-soft, .bg-page, .bg-wash, .bg-sun-soft, .bg-coral-soft) {
+      --color-ink: #f3f1fb;
+      --color-ink-2: #bdb9d4;
+      color: var(--color-ink);
+    }
+  }
 }
 
 /* A faint grid on the mint wash: the page reads as a work surface, the cards sit on top of it. */
@@ -45,14 +92,14 @@ body {
   font-weight: 500;
   background-color: var(--color-page);
   background-image:
-    linear-gradient(rgb(22 19 40 / 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(22 19 40 / 0.06) 1px, transparent 1px);
+    linear-gradient(var(--color-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 
 ::selection {
   background: var(--color-mint);
-  color: var(--color-ink);
+  color: #161328;
 }
 
 /* One focus treatment everywhere: an ink ring set off from the element by a page-coloured gap. Not on
@@ -61,6 +108,11 @@ body {
 :focus-visible:not([tabindex="-1"]) {
   outline: 2px solid var(--color-ink);
   outline-offset: 3px;
+}
+
+/* A fill's own ring sits outside it, on the page, so it can't use the dark ink meant for the fill's contents. */
+:is(.bg-mint, .bg-sun, .bg-lilac, .bg-coral):focus-visible {
+  outline-color: var(--color-line);
 }
 
 [tabindex="-1"]:focus {
@@ -74,7 +126,7 @@ textarea {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-ink) transparent;
+  scrollbar-color: var(--color-line) transparent;
 }
 
 /* The mark's rings scan while the model works. */

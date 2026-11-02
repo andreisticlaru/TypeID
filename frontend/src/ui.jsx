@@ -8,11 +8,11 @@ export const FILL = {
   sun: "bg-sun",
   lilac: "bg-lilac",
   coral: "bg-coral",
-  white: "bg-white",
+  white: "bg-surface",
 };
 
 const buttonBase =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-base border-2 border-ink font-sans font-bold text-ink cursor-pointer transition-all duration-100 disabled:cursor-not-allowed disabled:border-dashed disabled:bg-off disabled:text-ink-2 disabled:shadow-none";
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-base border-2 border-line font-sans font-bold text-ink cursor-pointer transition-all duration-100 disabled:cursor-not-allowed disabled:border-dashed disabled:bg-off disabled:text-ink-2 disabled:shadow-none";
 // Pressing into the shadow is the library's hover: the button moves by exactly the shadow offset.
 const pressable = "shadow-brutal enabled:hover:translate-x-1 enabled:hover:translate-y-1 enabled:hover:shadow-none";
 const buttonSizes = {
@@ -39,7 +39,7 @@ export function GhostButton({ className = "", ...props }) {
 export function Badge({ fill = "white", className = "", ...props }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-base border-2 border-ink px-2.5 py-0.5 text-[12.5px] font-bold whitespace-nowrap ${FILL[fill]} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-base border-2 border-line px-2.5 py-0.5 text-[12.5px] font-bold whitespace-nowrap ${FILL[fill]} ${className}`}
       {...props}
     />
   );
@@ -47,14 +47,14 @@ export function Badge({ fill = "white", className = "", ...props }) {
 
 export function Kbd({ children }) {
   return (
-    <kbd className="inline-grid place-items-center whitespace-nowrap min-w-[22px] h-[22px] px-1.5 rounded-base border-2 border-ink bg-white font-sans text-[11.5px] font-bold shadow-brutal-sm">
+    <kbd className="inline-grid place-items-center whitespace-nowrap min-w-[22px] h-[22px] px-1.5 rounded-base border-2 border-line bg-surface font-sans text-[11.5px] font-bold shadow-brutal-sm">
       {children}
     </kbd>
   );
 }
 
 export function Card({ as: Tag = "section", className = "", ...props }) {
-  return <Tag className={`rounded-base border-2 border-ink bg-white shadow-brutal ${className}`} {...props} />;
+  return <Tag className={`rounded-base border-2 border-line bg-surface shadow-brutal ${className}`} {...props} />;
 }
 
 export function Label({ as: Tag = "span", className = "", ...props }) {
