@@ -29,7 +29,7 @@ router = APIRouter()
 @router.get("/people", response_model=list[Person])
 def people() -> list[Person]:
     return [
-        Person(person_id=e["person_id"], name=e["name"])
+        Person(person_id=e["person_id"], name=e["name"], enroll_prompts=e["enroll_prompts"])
         for e in get_all_entries()
         if not e["person_id"].startswith(BACKGROUND_PREFIX)
     ]

@@ -56,6 +56,7 @@ class IdentifyResponse(BaseModel):
 class Person(BaseModel):
     person_id: str
     name: str
+    enroll_prompts: int
 
 
 class AuthenticateRequest(BaseModel):
