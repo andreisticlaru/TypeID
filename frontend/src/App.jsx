@@ -603,7 +603,7 @@ export default function App() {
       <header className="bg-white border-b-2 border-ink">
         <div className="mx-auto max-w-[1160px] px-4 py-3 sm:px-6 sm:py-3.5 flex flex-wrap items-center gap-x-6 gap-y-3">
           <div className="flex items-center gap-3 min-w-0">
-            <img src="/favicon.svg" alt="" width="48" height="48" className="shrink-0 drop-shadow-[3px_3px_0_var(--color-ink)]" />
+            <img src="/mark.svg" alt="" width="56" height="56" className="shrink-0" />
             <div className="min-w-0">
               <h1 className="m-0 font-display text-2xl font-bold leading-none tracking-tight">TypeID</h1>
               <p className="m-0 mt-1 text-[13px] leading-snug text-ink-2 hidden sm:block">

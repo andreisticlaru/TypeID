@@ -24,8 +24,8 @@ BACKGROUND_PREFIX = "aalto_"
 MIN_BACKGROUND = 30  # below this UMAP has too little to fit; fall back to PCA
 NEIGHBORS = 3
 MAP_PAGE = Path(__file__).resolve().parent.parent / "static" / "map.html"
-# The capture UI's one-ring mark, served from where the frontend keeps it rather than copied here.
-MARK = Path(__file__).resolve().parents[3] / "frontend" / "public" / "favicon.svg"
+# The capture UI's mark, served from where the frontend keeps it rather than copied here.
+MARK = Path(__file__).resolve().parents[3] / "frontend" / "public" / "mark.svg"
 
 _fit_lock = threading.Lock()
 _fitted: dict = {"ids": None, "reducer": None}
