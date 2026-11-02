@@ -110,6 +110,8 @@ const icons = {
   user: <path d="M8 8a2.6 2.6 0 1 0 0-5.2A2.6 2.6 0 0 0 8 8zM3 14c.6-2.6 2.6-4 5-4s4.4 1.4 5 4" />,
   search: <path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM10.6 10.6L14 14" />,
   shield: <path d="M8 1.8l5 2v4c0 3-2.2 5.2-5 6.4C5.2 13 3 10.8 3 7.8v-4z" />,
+  sun: <path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 1.5V3M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" />,
+  moon: <path d="M13.5 9.5A6 6 0 0 1 6.5 2.5a6 6 0 1 0 7 7z" />,
   map: <path d="M1.8 3.8l4-1.6 4.4 1.6 4-1.6v10l-4 1.6-4.4-1.6-4 1.6zM5.8 2.2v10M10.2 3.8v10" />,
 };
 
@@ -123,6 +125,34 @@ function ScanRings({ size = 18 }) {
       <circle cx="24" cy="24" r="10.5" fill="none" stroke="currentColor" strokeWidth="4" strokeDasharray="9 4.2"
         style={{ ...spin, animation: "scan-ccw 1.8s linear infinite" }} />
     </svg>
+  );
+}
+
+// Dark mode on/off. The theme lives on <html> (the script in index.html), so this only mirrors it, which also
+// picks up a change from the map's tab or from the system.
+function ThemeSwitch() {
+  const isDark = () => document.documentElement.dataset.theme === "dark";
+  const [dark, setDark] = useState(isDark);
+  useEffect(() => {
+    const observer = new MutationObserver(() => setDark(isDark()));
+    observer.observe(document.documentElement, { attributeFilter: ["data-theme"] });
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={dark}
+      aria-label="Dark mode"
+      onClick={window.toggleTheme}
+      className="ml-auto md:ml-0 grid h-11 w-14 shrink-0 cursor-pointer place-items-center rounded-base border-0 bg-transparent p-0"
+    >
+      <span className={`relative block h-8 w-14 rounded-base border-2 border-line shadow-brutal-sm transition-colors duration-100 ${dark ? "bg-mint" : "bg-surface"}`}>
+        <span className={`absolute left-[2px] top-[2px] grid size-6 place-items-center rounded-[3px] border-2 border-line bg-surface text-ink transition-transform duration-100 ${dark ? "translate-x-6" : ""}`}>
+          <Icon path={dark ? icons.moon : icons.sun} size={13} />
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -601,7 +631,7 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-surface border-b-2 border-line">
-        <div className="mx-auto max-w-[1160px] px-4 py-3 sm:px-6 sm:py-3.5 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="mx-auto max-w-[1160px] px-4 py-3 sm:px-6 sm:py-3.5 flex flex-wrap items-center gap-x-3 sm:gap-x-6 gap-y-3">
           <div className="flex items-center gap-3 min-w-0">
             <img src="/mark.svg" alt="" width="56" height="56" className="shrink-0" />
             <div className="min-w-0">
@@ -633,15 +663,18 @@ export default function App() {
             ))}
           </nav>
 
+          <ThemeSwitch />
+
           <a
             href={`${API}/map`}
+            aria-label="Map"
             target="_blank"
             rel="noreferrer"
-            className="ml-auto md:ml-0 inline-flex h-11 items-center gap-2 rounded-base border-2 border-line bg-surface px-4 font-bold text-ink no-underline shadow-brutal transition-all duration-100 hover:translate-x-1 hover:translate-y-1 hover:shadow-none"
+            className="inline-flex h-11 items-center gap-2 rounded-base border-2 border-line bg-surface px-4 font-bold text-ink no-underline shadow-brutal transition-all duration-100 hover:translate-x-1 hover:translate-y-1 hover:shadow-none"
           >
             <Icon path={icons.map} />
-            Map
-            <Icon path={icons.external} size={14} />
+            <span className="hidden min-[360px]:inline">Map</span>
+            <Icon path={icons.external} size={14} className="hidden sm:block" />
           </a>
         </div>
       </header>
