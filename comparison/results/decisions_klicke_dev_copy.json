@@ -1,0 +1,146 @@
+{
+  "split": "data/split_klicke_dev.json",
+  "cache": "data/preprocessed_klicke_copy",
+  "models": {
+    "C1": {
+      "cosine": {
+        "cllr": 0.347,
+        "cllr_ci95": [
+          0.331,
+          0.364
+        ],
+        "tippett_log10lr": [
+          -2.0,
+          -1.0,
+          0.0,
+          1.0,
+          2.0
+        ],
+        "genuine_above": [
+          99.94,
+          98.96,
+          89.41,
+          64.88,
+          33.99
+        ],
+        "impostor_above": [
+          89.96,
+          33.09,
+          8.57,
+          2.24,
+          0.4
+        ],
+        "misleading_strong_genuine": 1.04,
+        "misleading_strong_impostor": 2.24,
+        "anga_lower_bound": 9.98,
+        "ania_lower_bound": 3.09,
+        "genuine_accepted": 97.1,
+        "impostor_accepted": 6.2
+      },
+      "center+wccn": {
+        "cllr": 0.305,
+        "cllr_ci95": [
+          0.29,
+          0.321
+        ],
+        "tippett_log10lr": [
+          -2.0,
+          -1.0,
+          0.0,
+          1.0,
+          2.0
+        ],
+        "genuine_above": [
+          100.0,
+          99.22,
+          90.7,
+          70.0,
+          46.48
+        ],
+        "impostor_above": [
+          89.27,
+          28.12,
+          6.98,
+          2.07,
+          0.58
+        ],
+        "misleading_strong_genuine": 0.78,
+        "misleading_strong_impostor": 2.07,
+        "anga_lower_bound": 9.97,
+        "ania_lower_bound": 2.87,
+        "genuine_accepted": 96.8,
+        "impostor_accepted": 5.0
+      }
+    },
+    "v1": {
+      "cosine": {
+        "cllr": 0.363,
+        "cllr_ci95": [
+          0.345,
+          0.38
+        ],
+        "tippett_log10lr": [
+          -2.0,
+          -1.0,
+          0.0,
+          1.0,
+          2.0
+        ],
+        "genuine_above": [
+          99.94,
+          98.83,
+          89.38,
+          61.56,
+          27.06
+        ],
+        "impostor_above": [
+          84.6,
+          34.82,
+          9.57,
+          2.13,
+          0.22
+        ],
+        "misleading_strong_genuine": 1.17,
+        "misleading_strong_impostor": 2.13,
+        "anga_lower_bound": 9.94,
+        "ania_lower_bound": 3.14,
+        "genuine_accepted": 96.8,
+        "impostor_accepted": 6.5
+      },
+      "center+wccn": {
+        "cllr": 0.314,
+        "cllr_ci95": [
+          0.298,
+          0.33
+        ],
+        "tippett_log10lr": [
+          -2.0,
+          -1.0,
+          0.0,
+          1.0,
+          2.0
+        ],
+        "genuine_above": [
+          100.0,
+          99.07,
+          90.63,
+          69.69,
+          44.27
+        ],
+        "impostor_above": [
+          84.37,
+          29.11,
+          7.58,
+          2.12,
+          0.56
+        ],
+        "misleading_strong_genuine": 0.93,
+        "misleading_strong_impostor": 2.12,
+        "anga_lower_bound": 9.95,
+        "ania_lower_bound": 2.86,
+        "genuine_accepted": 96.0,
+        "impostor_accepted": 5.1
+      }
+    }
+  }
+}

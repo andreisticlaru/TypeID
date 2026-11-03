@@ -1,0 +1,230 @@
+{
+  "split": "data/split_klicke_dev.json",
+  "cache": "data/preprocessed_klicke_copy_essay",
+  "fit_split": null,
+  "fit_cache": null,
+  "models": {
+    "C1": {
+      "scored": 545,
+      "cohort": 136,
+      "variants": {
+        "cosine": {
+          "kvc_eer": 24.14,
+          "kvc_fnmr1": 79.93,
+          "kvc_eer_ci95": [
+            22.82,
+            25.47
+          ],
+          "delta_vs_cosine": 0.0,
+          "delta_ci95": [
+            0.0,
+            0.0
+          ]
+        },
+        "cosine snorm": {
+          "kvc_eer": 21.76,
+          "kvc_fnmr1": 75.45,
+          "kvc_eer_ci95": [
+            20.48,
+            23.01
+          ],
+          "delta_vs_cosine": -2.38,
+          "delta_ci95": [
+            -2.85,
+            -1.95
+          ]
+        },
+        "center": {
+          "kvc_eer": 21.41,
+          "kvc_fnmr1": 76.42,
+          "kvc_eer_ci95": [
+            20.16,
+            22.72
+          ],
+          "delta_vs_cosine": -2.73,
+          "delta_ci95": [
+            -3.34,
+            -2.2
+          ]
+        },
+        "center snorm": {
+          "kvc_eer": 21.3,
+          "kvc_fnmr1": 74.84,
+          "kvc_eer_ci95": [
+            19.91,
+            22.59
+          ],
+          "delta_vs_cosine": -2.84,
+          "delta_ci95": [
+            -3.49,
+            -2.24
+          ]
+        },
+        "wccn": {
+          "kvc_eer": 20.66,
+          "kvc_fnmr1": 75.21,
+          "kvc_eer_ci95": [
+            19.34,
+            21.87
+          ],
+          "delta_vs_cosine": -3.48,
+          "delta_ci95": [
+            -4.26,
+            -2.82
+          ]
+        },
+        "wccn snorm": {
+          "kvc_eer": 20.17,
+          "kvc_fnmr1": 73.71,
+          "kvc_eer_ci95": [
+            19.05,
+            21.23
+          ],
+          "delta_vs_cosine": -3.97,
+          "delta_ci95": [
+            -4.73,
+            -3.29
+          ]
+        },
+        "center+wccn": {
+          "kvc_eer": 20.17,
+          "kvc_fnmr1": 75.3,
+          "kvc_eer_ci95": [
+            18.99,
+            21.32
+          ],
+          "delta_vs_cosine": -3.97,
+          "delta_ci95": [
+            -4.71,
+            -3.28
+          ]
+        },
+        "center+wccn snorm": {
+          "kvc_eer": 19.89,
+          "kvc_fnmr1": 73.43,
+          "kvc_eer_ci95": [
+            18.79,
+            21.04
+          ],
+          "delta_vs_cosine": -4.25,
+          "delta_ci95": [
+            -4.97,
+            -3.52
+          ]
+        }
+      },
+      "fit_people": 680
+    },
+    "v1": {
+      "scored": 545,
+      "cohort": 136,
+      "variants": {
+        "cosine": {
+          "kvc_eer": 24.18,
+          "kvc_fnmr1": 79.56,
+          "kvc_eer_ci95": [
+            22.86,
+            25.58
+          ],
+          "delta_vs_cosine": 0.0,
+          "delta_ci95": [
+            0.0,
+            0.0
+          ]
+        },
+        "cosine snorm": {
+          "kvc_eer": 21.91,
+          "kvc_fnmr1": 75.58,
+          "kvc_eer_ci95": [
+            20.46,
+            23.05
+          ],
+          "delta_vs_cosine": -2.27,
+          "delta_ci95": [
+            -2.85,
+            -1.87
+          ]
+        },
+        "center": {
+          "kvc_eer": 21.01,
+          "kvc_fnmr1": 76.44,
+          "kvc_eer_ci95": [
+            19.91,
+            22.11
+          ],
+          "delta_vs_cosine": -3.17,
+          "delta_ci95": [
+            -3.82,
+            -2.59
+          ]
+        },
+        "center snorm": {
+          "kvc_eer": 20.83,
+          "kvc_fnmr1": 74.64,
+          "kvc_eer_ci95": [
+            19.56,
+            21.96
+          ],
+          "delta_vs_cosine": -3.35,
+          "delta_ci95": [
+            -4.06,
+            -2.77
+          ]
+        },
+        "wccn": {
+          "kvc_eer": 19.28,
+          "kvc_fnmr1": 74.62,
+          "kvc_eer_ci95": [
+            18.07,
+            20.34
+          ],
+          "delta_vs_cosine": -4.9,
+          "delta_ci95": [
+            -5.76,
+            -4.18
+          ]
+        },
+        "wccn snorm": {
+          "kvc_eer": 18.59,
+          "kvc_fnmr1": 72.86,
+          "kvc_eer_ci95": [
+            17.48,
+            19.83
+          ],
+          "delta_vs_cosine": -5.59,
+          "delta_ci95": [
+            -6.37,
+            -4.81
+          ]
+        },
+        "center+wccn": {
+          "kvc_eer": 18.86,
+          "kvc_fnmr1": 74.5,
+          "kvc_eer_ci95": [
+            17.65,
+            19.93
+          ],
+          "delta_vs_cosine": -5.32,
+          "delta_ci95": [
+            -6.15,
+            -4.61
+          ]
+        },
+        "center+wccn snorm": {
+          "kvc_eer": 18.59,
+          "kvc_fnmr1": 72.31,
+          "kvc_eer_ci95": [
+            17.25,
+            19.65
+          ],
+          "delta_vs_cosine": -5.59,
+          "delta_ci95": [
+            -6.49,
+            -4.93
+          ]
+        }
+      },
+      "fit_people": 680
+    }
+  }
+}

@@ -1,6 +1,27 @@
 # Shift plan: transcription → free text, across sessions and keyboards
 
-Status (2026-10-27): proposed, nothing started. Background, literature and sources: `paper-plan.md`.
+Status (2026-11-03): steps 1–3, 6 (WCCN, no PLDA) and 7 run on KLiCKe's dev half; 4–5 skipped by step 3's gate; 0, 2b
+and 8 wait on data access. Background, literature and sources: `paper-plan.md`.
+
+## Results so far (KLiCKe dev half, 1,361 people; C1 unless noted)
+
+| Enrol → query | KVC EER | Rank-1 | Cllr |
+|---|---|---|---|
+| copy → copy | 9.31 | 40.0 | 0.35 |
+| copy → essay | 23.58 | 9.2 | 0.73 |
+| essay → essay | 14.63 | 33.2 | 0.52 |
+
+- **Gap:** copy → essay − copy → copy = +14.27 EER [+13.50, +15.05]. Same on the 2,483-person wider group for
+  copy → essay − essay → essay (+8.88 vs +8.95), so the 15-chunk eligibility rule doesn't drive it.
+- **Pauses don't carry it:** capping closes 1% of the gap (−0.17 [−0.24, −0.04]) while the noise control costs +2.25;
+  pause-free essay queries barely move it (25.11 → 24.96, 966 people). Steps 4–5 (CPA) skipped.
+- **Back-end:** center+WCCN + s-norm, fitted on other people in the same condition: C1 −4.25 [−4.97, −3.52], v1 −5.59
+  [−6.49, −4.93], against s-norm alone −2.38 / −2.27. It closes about a third of the gap and doesn't transfer: fitted on
+  KeyRecs (session), WCCN makes C1 worse on KLiCKe (+1.46). On KeyRecs itself, too few people (49 fit, 40 scored) to call.
+- **Ranking changes under shift:** C1 beats TypeNet m0 by 8.2 EER on copy → copy, loses by 2.0 [1.36, 2.54] on copy → essay.
+- **Caveats:** KLiCKe's copy task is one phrase retyped at speed, not Aalto-style transcription, so the gap may be partly
+  that; BB-MAS (2b) is what tests it. Copy → copy is itself far below Aalto (EER 2.6), a dataset shift of its own.
+  KLiCKe's logger doesn't time modifiers, so Shift and Control are dropped. The test half is unscored; keep it for step 8.
 
 ## The question
 

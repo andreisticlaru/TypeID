@@ -20,3 +20,6 @@ backend/identify_log.jsonl
 # External zero-shot test data (KeyRecs, CC BY 4.0)
 data/keyrecs_raw/
 data/preprocessed_keyrecs_*/
+
+# External zero-shot test data (KLiCKe)
+data/preprocessed_klicke_*/
